@@ -3,7 +3,6 @@
 
 import sys
 import getopt
-import shutil
 import os
 from os.path import join, isdir, abspath
 
