@@ -112,8 +112,3 @@ if __name__ == "__main__":
             ignore_sys_files = False
 
     main(path_src, path_dst, pwd, ignore_sys_files)
-
-
-def asdf(sadf):
-  import os
-  print 'asdf'
