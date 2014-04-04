@@ -36,9 +36,20 @@ def log(msg, title=None):
     else:
         print msg
 
+def _FIX_osx_special_char(str):
+    str = str.strip()
+    out = ''
+    chars = [' ', '(', ')', '[', ']', '!', '$', '&', '*', ';', '|', '\\']
+    for c in str:
+        if c in chars:
+            out += '\\'
+        out += c
+    return out
+_FIX = _FIX_osx_special_char
+
 def exec_cmd(cmd, *param_list):
     for c in param_list:
-        cmd += ' ' + c.strip().replace(' ', '\ ')
+        cmd += ' ' + c
     log(cmd)
     os.system(cmd)
 
@@ -54,22 +65,22 @@ def zip_folder(path_src, path_dst, pwd, ignore_sys):
         if os.path.isdir(src):
             if pwd:
                 os.chdir(src)
-                exec_cmd('zip', '-r', '-P', pwd, dst + '.zip', '*')
+                exec_cmd('zip', '-r', '-P', _FIX(pwd), _FIX(dst + '.zip'), '*')
             elif is_ignore_dir(src, ignore_files, ignore_sys):
                 log(src, 'ignore')
-                exec_cmd('cp', '-R', src, dst)
+                exec_cmd('cp', '-R', _FIX(src), _FIX(dst))
             else:
                 os.chdir(src)
-                exec_cmd('zip', '-r', dst + '.zip', '*')
+                exec_cmd('zip', '-r', _FIX(dst + '.zip'), '*')
         else:
             if pwd:
                 os.chdir(path_src)
-                exec_cmd('zip', '-P', pwd, dst + '.zip', item)
+                exec_cmd('zip', '-P', _FIX(pwd), _FIX(dst + '.zip'), _FIX(item))
             elif is_ignore_file(src, ignore_files, ignore_sys):
-                exec_cmd('cp', src, dst)
+                exec_cmd('cp', _FIX(src), _FIX(dst))
             else:
                 os.chdir(path_src)
-                exec_cmd('zip', dst + '.zip', item)
+                exec_cmd('zip', _FIX(dst + '.zip'), _FIX(item))
 
 def usage():
     print \
