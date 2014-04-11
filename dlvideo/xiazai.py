@@ -67,7 +67,7 @@ def main():
         curr_dir = dirname(abspath(os.readlink(__file__)))
     else:
         curr_dir = dirname(abspath(__file__))
-    config = json.load(open(pjoin(curr_dir, 'xiazai.json')))
+    config = json.load(open(pjoin(curr_dir, 'dlvideo.json')))
     url = None
     if len(sys.argv) > 1:
         url = sys.argv[1]
@@ -90,13 +90,3 @@ if __name__ == "__main__":
         pass
 
 
-# import MySQLdb
-# from DBUtils.PooledDB import PooledDB
-# dbpool = PooledDB(creator=MySQLdb, maxusage=1000,host='localhost',user='myuser', passwd='mypassword',db='mydb')
-# 使用连接池的方法很简单：
-# conn = dbpool.connection()
-# cur = conn.cursor()
-# cur.execute('SELECT * FROM mytable WHERE id=myid')
-# dataset = cur.fetchall()
-# cur.close()
-# conn.close()
