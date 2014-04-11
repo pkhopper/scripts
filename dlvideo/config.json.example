@@ -1,0 +1,25 @@
+{
+    "default":
+    {
+        "out_dir": "%(home)s/download"
+    },
+    "u2b":
+    {
+        "cmd": "%(home)s/bin/youtube-dl ",
+        "proxy": "",
+        "cache": ".u2cache",
+        "out_dir": "%(home)s/download/%(title)s-%(id)s.%(ext)s",
+        "creat_dir": false
+    },
+    "xiazai":
+    {
+        "cmd": "py %(home)s/pkhopper/youku-lixian/video_lixian.py ",
+        "out_dir": "%(home)s/download",
+        "creat_dir": false
+    },
+    "downloads":
+    {
+        "out_dir": "%(home)s/download",
+        "lib_dir": "%(home)s/pkhopper/youku-lixian"
+    }
+}
