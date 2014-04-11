@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from dlmusic import songsdb
-
 reload(sys)
 sys.setdefaultencoding('utf-8')
 import os
@@ -11,6 +9,7 @@ import re
 import urllib
 import urllib2
 import cookielib
+import songsdb
 
 ###### config ##########
 if os.path.islink(__file__):
