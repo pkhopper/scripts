@@ -1,14 +1,14 @@
 [default]
-    out_dir = %(home)s/download
-    flvcd = true
+out_dir =
+flvcd =
 
 [script]
-    cmd =
-    lib_dir =
+cmd =
+lib_dir =
 
 [u2b]
-    cmd =
-    proxy =
-    cache =
-    out_dir =
-    create_dir =
+cmd =
+proxy =
+cache =
+title_format =
+create_dir =
