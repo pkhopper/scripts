@@ -21,7 +21,7 @@ class Config:
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
         cfg.read(pjoin(curr_dir, config))
-        self.flvcd = cfg.getboolean('default', 'flvcd')
+        # self.flvcd = cfg.getboolean('default', 'flvcd')
         self.out_dir = cfg.get('default', 'out_dir')
         self.lib_dir = cfg.get('script', 'lib_dir')
         self.cmd = cfg.get('script', 'cmd')
@@ -30,6 +30,9 @@ class Config:
         self.u2b_cache = cfg.get('u2b', 'cache')
         self.u2b_title_format = cfg.get('u2b', 'title_format', raw=True)
         self.u2b_create_dir = cfg.get('u2b', 'create_dir')
+        self.flvcd = {}
+        for k,v in cfg.items('flvcd'):
+            self.flvcd[k] = v.lower() == 'true'
 config = Config()
 
 def dl_u2b(url):
@@ -94,9 +97,11 @@ def dl_from_flvcd(url):
     from vavava.httputil import HttpUtil
     url1 = 'http://www.flvcd.com/parse.php?'
     url1 += 'kw='+ urllib.quote(url)
-    url1 += 'flag=one'
-    url1 += 'format=super'
-    html = HttpUtil().get(url1).decode('gb2312')
+    url1 += '&flag=one'
+    url1 += '&format=super'
+    http = HttpUtil()
+    http.add_header('Referer', url1)
+    html = http.get(url1).decode('gb2312')
     m3u = findall(r'name="inf" value="(?P<as>[^"]*)"', html)[0]
     title = findall(u'<strong>当前解析视频：</strong>(?P<as>[^<]*)<strong>', html)[0]
     title = title.strip()
@@ -120,6 +125,11 @@ def dl_urls(urls, title):
     common.download_urls(urllist, title, ext, total_size=size,
                   output_dir=out_dir, refer=urls[0], merge=merge)
 
+def available_4flvcd(url):
+    import re
+    result = re.findall(r'(?P<as>[^\\/\.]*\.[^\\/\.]*)[\\|/]', url.lower())[0]
+    return result
+
 def main():
     url = None
     if len(sys.argv) > 1:
@@ -128,7 +138,7 @@ def main():
         dl_m3u(url)
     elif url.find("youtube.com") >= 0:
         dl_u2b(url)
-    elif config.flvcd:
+    elif config.flvcd['default'] and config.flvcd[available_4flvcd(url)]:
         dl_from_flvcd(url)
     else:
         dl_other(url)
