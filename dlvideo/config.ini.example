@@ -1,6 +1,5 @@
 [default]
 out_dir =
-flvcd =
 
 [script]
 cmd =
@@ -12,3 +11,8 @@ proxy =
 cache =
 title_format =
 create_dir =
+
+[flvcd]
+default = true
+sohu.com = False
+youku.com = true

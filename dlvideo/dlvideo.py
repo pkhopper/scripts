@@ -138,7 +138,9 @@ def main():
         dl_m3u(url)
     elif url.find("youtube.com") >= 0:
         dl_u2b(url)
-    elif config.flvcd['default'] and config.flvcd[available_4flvcd(url)]:
+    elif config.flvcd['default'] \
+        and available_4flvcd(url) in config.flvcd \
+        and config.flvcd[available_4flvcd(url)]:
         dl_from_flvcd(url)
     else:
         dl_other(url)
