@@ -138,12 +138,12 @@ def main():
         dl_m3u(url)
     elif url.find("youtube.com") >= 0:
         dl_u2b(url)
-    elif config.flvcd['default'] \
-        and available_4flvcd(url) in config.flvcd \
-        and config.flvcd[available_4flvcd(url)]:
-        dl_from_flvcd(url)
-    else:
-        dl_other(url)
+    elif config.flvcd['default']:
+        site = available_4flvcd(url)
+        if site not in config.flvcd or config.flvcd[site]:
+            dl_from_flvcd(url)
+        else:
+            dl_other(url)
 
 if __name__ == "__main__":
     # signal_handler = util.SignalHandlerBase()
