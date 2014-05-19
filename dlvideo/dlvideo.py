@@ -106,9 +106,9 @@ def dl_from_flvcd(url):
     title = findall(u'<strong>当前解析视频：</strong>(?P<as>[^<]*)<strong>', html)[0]
     title = title.strip()
 
-    dl_urls([url for url in m3u.split('|')], title)
+    dl_urls(urls=[url for url in m3u.split('|')], title=title, refer=url)
 
-def dl_urls(urls, title):
+def dl_urls(urls, title, refer=None):
     urllist = []
     for url in urls:
         if url.startswith('http'):
@@ -123,7 +123,7 @@ def dl_urls(urls, title):
     sys.path.insert(0, lib_dir)
     common = __import__('common')
     common.download_urls(urllist, title, ext, total_size=size,
-                  output_dir=out_dir, refer=urls[0], merge=merge)
+                  output_dir=out_dir, refer=refer, merge=merge)
 
 def available_4flvcd(url):
     import re
