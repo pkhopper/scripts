@@ -1,0 +1,18 @@
+[default]
+out_dir =
+
+[script]
+cmd =
+lib_dir =
+
+[u2b]
+cmd =
+proxy =
+cache =
+title_format =
+create_dir =
+
+[flvcd]
+default = true
+sohu.com = False
+youku.com = true

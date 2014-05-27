@@ -9,7 +9,7 @@ import urllib
 import urllib2
 import xml.etree.ElementTree as ET
 
-from dlmusic.xiami_dl import get_downloader
+from xiami_dl import get_downloader
 
 # ID3 tags support depends on Mutagen
 try:
