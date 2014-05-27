@@ -1,18 +1,10 @@
 [default]
 out_dir =
+channel = http://***/playlist.m3u8
 
-[script]
-cmd =
-lib_dir =
+[address_file]
+name = address.txt
 
-[u2b]
-cmd =
-proxy =
-cache =
-title_format =
-create_dir =
-
-[flvcd]
-default = true
-sohu.com = False
-youku.com = true
+[proxy]
+enable = false
+addr =
