@@ -26,6 +26,7 @@ class Search:
                 print 'url: ', movie['url']
                 print 'img: ', movie['img']
 
+
 def usage():
     print \
         """
