@@ -2,17 +2,12 @@
 # coding=utf-8
 
 import os
+import sys
 import time
 import urllib
 import re
 from time import sleep
-from vavava.httputil import HttpUtil
-from vavava.httputil import DownloadStreamHandler
-from vavava import util
 
-util.set_default_utf8()
-LOG = util.get_logger()
-CHARSET = "utf-8"
 dirname = os.path.dirname
 abspath = os.path.abspath
 pjoin = os.path.join
@@ -30,10 +25,20 @@ class Config:
         cfg.read(pjoin(script_path, config))
         self.out_dir = cfg.get('default', 'out_dir')
         self.channel = cfg.get('default', 'channel')
+        self.pythonpath = cfg.get('environment', 'pythonpath')
         self.address_file = cfg.get('address_file', 'name')
         self.proxy_addr = cfg.get('proxy', 'addr')
         self.proxy_enable = cfg.getboolean('proxy', 'enable')
 config = Config()
+
+sys.path.insert(0, config.pythonpath)
+from vavava.httputil import HttpUtil
+from vavava.httputil import DownloadStreamHandler
+from vavava import util
+util.set_default_utf8()
+LOG = util.get_logger()
+CHARSET = "utf-8"
+
 
 def guess_url_base(url):
     if url.find('ifeng.com') > 0:
@@ -137,11 +142,7 @@ def main():
         elif k in ("-p"):
             path = os.path.abspath(v)
         elif k in ("-l"):
-            script_path = './'
-            if os.path.islink(__file__):
-                script_path = dirname(abspath(os.readlink(__file__)))
-            else:
-                script_path = dirname(abspath(__file__))
+            script_path = util.get_file_path(__file__)
             os.system('python %s/xbmc_5ivdo.py > %s/%s'%(
                 script_path, script_path, config.address_file))
             exit(0)
