@@ -43,10 +43,10 @@ class SearchPage:
         for movie in movies:
             try:
                 children = movie.getchildren()
-                a = children[0]
-                url = a.get('href')
-                span = a.find('span')
-                p = movie.find(r'p[@class="pl"]')
+                a = children[0] # title
+                url = a.get('href') # addr
+                span = a.find('span') # alias
+                p = movie.find(r'p[@class="pl"]') # score
                 span_rating_nums = movie.find(r'div/span[@class="rating_nums"]')
                 title = a.text
                 if span is not None:
