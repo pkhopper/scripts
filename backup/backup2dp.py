@@ -5,6 +5,7 @@ import os
 import zipfile
 from sys import argv
 from time import localtime, strftime
+from vavava import util
 
 __all__ = []
 
@@ -151,7 +152,7 @@ def main():
     import getopt
     import json
 
-    cfg_file = __file__[0: __file__.rfind('.')] + r'.json'
+    cfg_file = os.path.join(util.get_file_path(__file__), 'backup2dp.json')
     opts, args = getopt.getopt(argv[1:], "c:")
     for k, v in opts:
         if k in ("-c"):
