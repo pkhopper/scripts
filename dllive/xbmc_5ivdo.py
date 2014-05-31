@@ -14,7 +14,6 @@ from vavava import util
 util.set_default_utf8()
 
 UserAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.0.3) Gecko/2008092417 Firefox/3.0.3'
-menu_title = None
 
 def get_params(pmenustr=None):
     param = []
@@ -87,7 +86,7 @@ def showdata(purl):
         listA = []
         listP = []
         for imode, ititle, iurl ,iother in match:
-            print '%s@%s\n'%(ititle, iurl)
+            print '%s#%s\n'%(ititle, iurl)
     else:
         ipara = ''
         if match0.find('matchstr') > 0:
@@ -106,42 +105,51 @@ def showdata(purl):
             ipara = ipara + "&options="+urllib.quote_plus(iioptions)
         match = re.compile('<mode>(.+?)</mode><title>(.+?)</title><url>(.+?)</url><thumb>(.+?)</thumb>').findall(link)
         for imode, ititle, iurl ,ithumb in match:
-            print '%s, %s\n'%(ititle, iurl)
+            print '%s#%s\n'%(ititle, iurl)
 
-def interact(info_array):
-    tmp_i = 0
-    for imode, ititle, iurl, ithumb in info_array:
-        print '[%d]%s'%(tmp_i, ititle)
-        tmp_i += 1
-    ipt = int(raw_input('=>'))
-    imode, ititle, iurl = info_array[ipt][0], info_array[ipt][1], info_array[ipt][2]
-    if imode == 'menu':
-        url = os.path.join('http://www.5ivdo.net/', iurl)
-        print '# Menu:', url
-        showmenu(url, print_all)
-    elif imode == 'data':
-        showdata(os.path.join('http://www.5ivdo.net/', iurl))
+class HandlerBase:
+    def handle(self, rootfile):
+        raise Exception('not support') #???
 
-def print_all(info_array):
-    for imode, ititle, iurl,ithumb in info_array:
+class PrintAllHandler(HandlerBase):
+    def handle(self, rootfile):
+        for imode, ititle, iurl,ithumb in rootfile:
+            if imode == 'menu':
+                showmenu(os.path.join('http://www.5ivdo.net/', iurl), self)
+            elif imode == 'data':
+                showdata(os.path.join('http://www.5ivdo.net/', iurl))
+
+class InteractHandler(HandlerBase):
+    def handle(self, rootfile):
+        tmp_i = 0
+        for imode, ititle, iurl, ithumb in rootfile:
+            print '[%d]%s'%(tmp_i, ititle)
+            tmp_i += 1
+        ipt = int(raw_input('=>'))
+        imode, ititle, iurl = rootfile[ipt][0], rootfile[ipt][1], rootfile[ipt][2]
         if imode == 'menu':
-            showmenu(os.path.join('http://www.5ivdo.net/', iurl), print_all)
+            url = os.path.join('http://www.5ivdo.net/', iurl)
+            print '# Menu:', url
+            showmenu(url, PrintAllHandler())
         elif imode == 'data':
             showdata(os.path.join('http://www.5ivdo.net/', iurl))
 
-def print_menu(info_array):
-    for imode, ititle, iurl,ithumb in info_array:
-        if imode == 'menu' and ititle == menu_title:
-            showmenu(os.path.join('http://www.5ivdo.net/', iurl), print_all)
+class PrintMenuHandler(HandlerBase):
+    def __init__(self, title):
+        self.title = title
+    def handle(self, rootfile):
+        for imode, ititle, iurl,ithumb in rootfile:
+            if imode == 'menu' and ititle.find(self.title) > 0:
+                showmenu(os.path.join('http://www.5ivdo.net/', iurl), PrintAllHandler())
 
-def showmenu(purl, handle):
+def showmenu(purl, handler):
     link = Get5ivdoData(purl)
     if not link:
         return
     match = re.compile('<mode>(.+?)</mode><title>(.+?)</title><url>(.+?)</url><thumb>(.+?)</thumb>').findall(link)
-    handle(match)
+    handler.handle(match)
 
-def rootList(handle):
+def rootList(handler):
     irootfile = None
     link = GetHttpData('http://www.5ivdo.net/index.xml')
     match0 = re.compile('<config>(.+?)</config>', re.DOTALL).search(link)
@@ -149,7 +157,7 @@ def rootList(handle):
     for iname, ivalue in match:
         if iname == 'rootfile':
             irootfile = ivalue
-    showmenu(irootfile, handle)
+    showmenu(irootfile, handler)
 
 def usage():
     print \
@@ -160,7 +168,7 @@ usage:
 
 if __name__ == "__main__":
     config = ''
-    handle = print_all
+    handler = PrintAllHandler()
     opts, args = getopt.getopt(sys.argv[1:], "hic:t:f:", [])
     for k, v in opts:
         if k in ("-h"):
@@ -169,10 +177,9 @@ if __name__ == "__main__":
         elif k in ("-c"):
             config = v
         elif k in ("-i"):
-            handle = interact
+            handler = InteractHandler()
         elif k in ("-t"):
-            handle = print_menu
-            menu_title = v
+            handler = PrintMenuHandler(v)
 
-    rootList(handle)
+    rootList(handler)
     exit(0)
