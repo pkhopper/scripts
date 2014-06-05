@@ -96,8 +96,8 @@ class DownloadLiveStream:
             if duration > 0 and tt < 0:
                 break
             t1 = time.time()
-            count = self._dl_m3u81(url, duration, ofp)
-            wait = (abs(count)-1)*12 - (time.time() - t1)
+            count, total = self._dl_m3u81(url, duration, ofp)
+            wait = (total-1)*12 - (time.time() - t1)
             print 'sleep==>', wait
             if wait > 5:
                 sleep(wait)
@@ -112,7 +112,7 @@ class DownloadLiveStream:
                 self.http.fetch(url, download_handle)
                 self.filter[url] = ''
                 count += 1
-        return count
+        return count, len(urls)
 
     def _dl_ts(self, url, duration, ofp):
         print 'Download: ', url
