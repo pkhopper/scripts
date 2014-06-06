@@ -65,7 +65,7 @@ class DownloadLiveStream:
         self.url_base = filter_host(self.url)
         self.duration = duration
         self.odir = output
-        self.start = util.get_time_string()
+        self.start = time.time()
         self.filter = dict()
         self.http = HttpUtil(charset="utf-8")
         self.http.add_header('Referer', self.url_base)
@@ -130,7 +130,9 @@ class DownloadLiveStream:
 
     def recode(self, url, duration, output):
         self._init(url, duration, output)
-        LOG.info("[start.... ] %s", util.get_time_string())
+        LOG.info("===>start: %s", util.get_time_string())
+        LOG.info("===>duration: %d", duration)
+        LOG.info("===>output: %s", output)
         try:
             outfile = pjoin(self.odir, util.get_time_string() + ".flv")
             ofp = open(outfile, 'w')
@@ -138,9 +140,19 @@ class DownloadLiveStream:
                 self._dl_m3u8(url, duration, ofp)
             else:
                 self._dl_ts(url, duration, ofp)
-            LOG.info("[stop] %s", util.get_time_string())
+            LOG.info("===>stop %s", util.get_time_string())
+        except KeyboardInterrupt as e:
+            raise e
         except Exception as e:
             LOG.exception(e)
+            new_duration = time.time() - self.start - duration
+            if new_duration == 0:
+                exit(0)
+            if duration == 0:
+                new_duration = 0
+            if new_duration >= 0:
+                LOG.info('===>Exception happened, restart in one second.')
+                self.recode(url, new_duration, output)
         finally:
             pass
 
@@ -182,6 +194,6 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt as e:
-        print 'end by user'
+        print 'stop by user'
         exit(0)
 
