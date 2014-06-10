@@ -35,12 +35,15 @@ class Config:
             self.flvcd[k] = v.lower() == 'true'
 config = Config()
 
-def dl_u2b(url):
+def dl_u2b(url, argv):
     cmd = config.u2b_cmd
     cmd += r' --proxy "%s"' % config.u2b_proxy
     cmd += r' --o "%s"' % config.u2b_title_format
     cmd += r' --cache-dir "%s"' % config.u2b_cache
-    cmd += r' "%s"' % url
+    for arg in argv:
+        cmd += ' ' + arg
+    cmd += r' %s' % url
+    print '==>', cmd
     os.system(cmd)
 
 def dl_other(url):
@@ -137,7 +140,7 @@ def main():
     if not url or not url.startswith("http"):
         dl_m3u(url)
     elif url.find("youtube.com") >= 0:
-        dl_u2b(url)
+        dl_u2b(url, sys.argv[2:])
     elif config.flvcd['default']:
         site = available_4flvcd(url)
         if site not in config.flvcd or config.flvcd[site]:
