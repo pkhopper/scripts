@@ -128,6 +128,13 @@ class DownloadLiveStream:
             return True
         return False
 
+    def _recode(self, url, duration, ofp):
+        if url.endswith('.m3u8') or self._is_url_file(url):
+            self._dl_m3u8(url, duration, ofp)
+        else:
+            self._dl_ts(url, duration, ofp)
+        LOG.info("===>stop %s", util.get_time_string())
+
     def recode(self, url, duration, output):
         self._init(url, duration, output)
         LOG.info("===>start: %s", util.get_time_string())
@@ -136,11 +143,7 @@ class DownloadLiveStream:
         self.outfile = pjoin(self.odir, util.get_time_string() + ".flv")
         ofp = open(self.outfile, 'w')
         try:
-            if url.endswith('.m3u8') or self._is_url_file(url):
-                self._dl_m3u8(url, duration, ofp)
-            else:
-                self._dl_ts(url, duration, ofp)
-            LOG.info("===>stop %s", util.get_time_string())
+            self._recode(url, duration, ofp)
         except KeyboardInterrupt as e:
             raise e
         except Exception as e:
@@ -152,7 +155,7 @@ class DownloadLiveStream:
                 new_duration = 0
             if new_duration >= 0:
                 LOG.info('===>Exception happened, restart in one second.')
-                self.recode(url, new_duration, output)
+                self._recode(url, duration, ofp)
         finally:
             pass
 
