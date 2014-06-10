@@ -133,9 +133,9 @@ class DownloadLiveStream:
         LOG.info("===>start: %s", util.get_time_string())
         LOG.info("===>duration: %d", duration)
         LOG.info("===>output: %s", output)
+        self.outfile = pjoin(self.odir, util.get_time_string() + ".flv")
+        ofp = open(self.outfile, 'w')
         try:
-            outfile = pjoin(self.odir, util.get_time_string() + ".flv")
-            ofp = open(outfile, 'w')
             if url.endswith('.m3u8') or self._is_url_file(url):
                 self._dl_m3u8(url, duration, ofp)
             else:
