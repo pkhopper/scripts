@@ -156,17 +156,28 @@ class DownloadLiveStream:
         finally:
             pass
 
+def useage():
+    print """\
+    dllive -d duration
+    dllive -f favorites
+    dllive -o output_path
+    dllive -l
+    """
+
 def main():
     import getopt
     import sys
     channel = None
     duration = 0
     path = os.path.join(os.environ['HOME'], 'Downloads')
-    opts, args = getopt.getopt(sys.argv[1:], "d:f:p:j:l")
+    opts, args = getopt.getopt(sys.argv[1:], "d:f:o:lh")
     for k, v in opts:
         if k in ("-d"):
             duration = float(v)
-        elif k in ("-p"):
+        elif k in ("-h"):
+            useage()
+            exit(0)
+        elif k in ("-o"):
             path = os.path.abspath(v)
         elif k in ("-f"):
             for f in config.favorites:
