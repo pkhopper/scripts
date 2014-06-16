@@ -35,6 +35,13 @@ class Config:
             self.flvcd[k] = v.lower() == 'true'
 config = Config()
 
+# sys.path.insert(0, config.lib_dir)
+# common = __import__('common')
+# download_urls = common.download_urls
+import dl_helper
+download_urls = dl_helper.download_urls
+
+
 def dl_u2b(url, argv):
     cmd = config.u2b_cmd
     cmd += r' --proxy "%s"' % config.u2b_proxy
@@ -121,12 +128,8 @@ def dl_urls(urls, title, refer=None):
         ext = 'mp4'
     size = 1024*1024*100
     merge = True
-    out_dir = config.out_dir
-    lib_dir = config.lib_dir
-    sys.path.insert(0, lib_dir)
-    common = __import__('common')
-    common.download_urls(urllist, title, ext, total_size=size,
-                  output_dir=out_dir, refer=refer, merge=merge)
+    download_urls(urllist, title, ext, total_size=size,
+                  output_dir=config.out_dir, refer=refer, merge=merge)
 
 def dl_dispatch(url, is_m3u=False):
     if is_m3u:
