@@ -21,8 +21,8 @@ class Config:
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
         cfg.read(pjoin(curr_dir, config))
-        # self.flvcd = cfg.getboolean('default', 'flvcd')
         self.out_dir = cfg.get('default', 'out_dir')
+        self.format = cfg.get('default', 'format')
         self.lib_dir = cfg.get('script', 'lib_dir')
         self.cmd = cfg.get('script', 'cmd')
         self.u2b_cmd = cfg.get('u2b', 'cmd')
@@ -98,17 +98,17 @@ def dl_from_flvcd(url):
     import urllib
     from re import findall
     from vavava.httputil import HttpUtil
-    url1 = 'http://www.flvcd.com/parse.php?'
-    url1 += 'kw='+ urllib.quote(url)
-    url1 += '&flag=one'
-    url1 += '&format=super'
+    parse_url = 'http://www.flvcd.com/parse.php?'
+    parse_url += 'kw='+ urllib.quote(url)
+    parse_url += '&flag=one'
+    if config.format == 'super':
+        parse_url += '&format=super'
     http = HttpUtil()
-    http.add_header('Referer', url1)
-    html = http.get(url1).decode('gb2312')
+    http.add_header('Referer', parse_url)
+    html = http.get(parse_url).decode('gb2312')
     m3u = findall(r'name="inf" value="(?P<as>[^"]*)"', html)[0]
     title = findall(u'<strong>当前解析视频：</strong>(?P<as>[^<]*)<strong>', html)[0]
     title = title.strip()
-
     dl_urls(urls=[url for url in m3u.split('|')], title=title, refer=url)
 
 def dl_urls(urls, title, refer=None):
@@ -128,31 +128,54 @@ def dl_urls(urls, title, refer=None):
     common.download_urls(urllist, title, ext, total_size=size,
                   output_dir=out_dir, refer=refer, merge=merge)
 
-def available_4flvcd(url):
-    import re
-    result = re.findall(r'(?P<as>[^\\/\.]*\.[^\\/\.]*)[\\|/]', url.lower())[0]
-    return result
-
-def main():
-    url = None
-    if len(sys.argv) > 1:
-        url = sys.argv[1]
-    if not url or not url.startswith("http"):
+def dl_dispatch(url, is_m3u=False):
+    if is_m3u:
         dl_m3u(url)
-    elif url.find("youtube.com") >= 0:
+        return
+    if url.find("youtube.com") >= 0:
         dl_u2b(url, sys.argv[2:])
     elif config.flvcd['default']:
+        import re
+        available_4flvcd = \
+            lambda x: re.findall(r'(?P<as>[^\\/\.]*\.[^\\/\.]*)[\\|/]', x.lower())[0]
         site = available_4flvcd(url)
         if site not in config.flvcd or config.flvcd[site]:
             dl_from_flvcd(url)
         else:
             dl_other(url)
 
+def useage():
+    print """\
+    dllive -f super|normal
+    dllive -o output_path
+    """
+
+def main():
+    import getopt
+    is_m3u = False
+    opts, args = getopt.getopt(sys.argv[1:], "f:o:hm")
+    for k, v in opts:
+        if k in ("-f"):
+            config.format = v
+        elif k in ("-m"):
+            is_m3u = True
+        elif k in ("-o"):
+            config.out_dir = v
+        elif k in ("-h"):
+            useage()
+            exit(0)
+    urls = args
+    for url in urls:
+        dl_dispatch(url, is_m3u)
+
 if __name__ == "__main__":
     # signal_handler = util.SignalHandlerBase()
     try:
         main()
         os.system(r'say "download finished!!"')
+    except KeyboardInterrupt as e:
+        print 'stop by user'
+        exit(0)
     except Exception, e:
         os.system(r'say "download failed!!"')
         raise
