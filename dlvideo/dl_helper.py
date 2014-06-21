@@ -99,7 +99,7 @@ class DownloadThread:
         self.thread.start()
     def _run(self,*_args, **_kwargs):
         if os.path.isfile(self.filepath):
-            print "[Already done] ", self.filepath
+            print "[Already done, abort] ", self.filepath
             return
         _dl_methods(self.url, self.filepath+"!", self.refer)
         os.rename(self.filepath+"!", self.filepath)

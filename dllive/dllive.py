@@ -109,7 +109,7 @@ class M3u8:
                 self.http.fetch(url, download_handle)
                 self.old_ts_filter[url] = ''
                 count += 1
-        return count, TARGETDURATION
+        return count, len(urls), TARGETDURATION
 
     def dl(self, url, url_base, duration, ofp):
         start = time.time()
@@ -122,11 +122,13 @@ class M3u8:
             if duration > 0 and tt < 0:
                 break
             t1 = time.time()
-            count, TARGETDURATION = self._dl_1(url, url_base, duration, ofp)
-            wait = (count-1)*TARGETDURATION - (time.time() - t1)
+            count, total, TARGETDURATION = self._dl_1(url, url_base, duration, ofp)
+            wait = (total - count)*TARGETDURATION - (time.time() - t1)
             LOG.debug('sleep==> %s', wait)
             if wait > 0:
                 sleep(wait)
+            else:
+                LOG.error('wait=%d', wait)
 
 class DownloadLiveStream:
 
@@ -176,12 +178,13 @@ class DownloadLiveStream:
             raise e
         except Exception as e:
             LOG.exception(e)
-            new_duration = time.time() - self.start - duration
-            if new_duration == 0:
-                LOG.info("===>stopped, but exception happened. %s", util.get_time_string())
-                exit(0)
             if duration == 0:
                 new_duration = 0
+            else:
+                new_duration = duration - (time.time() - self.start)
+            if duration > 0 and new_duration <= 0:
+                LOG.info("===>stopped, but exception happened. %s", util.get_time_string())
+                exit(0)
             if new_duration >= 0:
                 LOG.info('===>exception happened, restart ...')
                 self._recode(url, duration, ofp)
@@ -206,10 +209,9 @@ def interact():
 
 def useage():
     print """\
-    dllive -d duration
-    dllive -f favorites
-    dllive -o output_path
+    dllive [-d duration] [-f favorites] [-o output_path]
     dllive -l
+    dllive -i
     """
 
 def main():
