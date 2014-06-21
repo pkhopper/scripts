@@ -29,7 +29,7 @@ def escape_file_path(path):
     path = path.replace('?', '-')
     return path
 
-def _dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
+def dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
     if os.path.isfile(vfile):
         print "[Already done, abort] ", vfile
         return
@@ -66,10 +66,9 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
     print '[============ n=%d ================]'%(len(urls))
     for i, url in enumerate(urls):
         filename = '%s[%02d].%s' % (title, i, ext)
-        file_path = pjoin(tmp_path, filename)
-        files.append(file_path)
+        files.append(pjoin(tmp_path, filename))
         print '[download] %s'%(url)
-        _dl_methods(url, vfile, refer=refer, nthread=10, nperfile=True)
+        dl_methods(url, vfile, refer=refer, nthread=10, nperfile=True)
     if len(urls) == 1:
         print 'ok'
         return
@@ -105,7 +104,7 @@ def playlist_not_supported(name):
 #         self.join = self.thread.join
 #         self.thread.start()
 #     def _run(self,*_args, **_kwargs):
-#         _dl_methods(url=self.url, out=self.file_path,
+#         dl_methods(url=self.url, out=self.file_path,
 #                     n_perfile=self.n_perfile, refer=self.refer)
 
 class Wget:
