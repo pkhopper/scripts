@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding=utf-8
 
-import threading
 import os
 import sys
 from vavava import util
@@ -30,79 +29,84 @@ def escape_file_path(path):
     path = path.replace('?', '-')
     return path
 
-def _dl_methods(url, filepath, refer):
+def _dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
+    if os.path.isfile(vfile):
+        print "[Already done, abort] ", vfile
+        return
     # 3 methods to download url
-    # 1:
-    # Wget().get(url, filepath, referer=refer)
-    # 2:
-    Axel().get(url, filepath, n=10, referer=refer)
+    tmp_file = vfile + '!'
+    if not nperfile:
+        # 1:
+        Wget().get(url=url, out=tmp_file, referer=refer)
+    else:
+        # 2:
+        Axel().get(url=url, out=tmp_file, n=nthread, referer=refer)
     # 3
     # print 'Downloading %s ...' % filename
-    # url_save(url, filepath, bar, refer=refer)
+    # url_save(url, tmp_file, bar, refer=refer)
     # bar.done()
+    os.rename(tmp_file, vfile)
 
 
-def download_urls(urls, title, ext, total_size, output_dir='.', refer=None, merge=True):
+def download_urls(urls, title, ext, odir='.', nthread=10,
+                  nperfile=True, refer=None, merge=True):
     assert urls
     assert ext in ('flv', 'mp4')
     title = to_native_string(title)
     title = escape_file_path(title)
     filename = '%s.%s' % (title, ext)
-    filepath = pjoin(output_dir, filename)
+    vfile = pjoin(odir, filename)
+    files = []
+    print 'Downloading %s.%s ...' % (title, ext)
+    tmp_path = pjoin(odir, '.dlvideo')
+    if not os.path.isdir(tmp_path):
+        os.mkdir(tmp_path)
+    for url in urls:
+        print "[url] ", url
+    print '[============ n=%d ================]'%(len(urls))
+    for i, url in enumerate(urls):
+        filename = '%s[%02d].%s' % (title, i, ext)
+        file_path = pjoin(tmp_path, filename)
+        files.append(file_path)
+        print '[download] %s'%(url)
+        _dl_methods(url, vfile, refer=refer, nthread=10, nperfile=True)
     if len(urls) == 1:
-        _dl_methods(urls[0], filepath+"!", refer)
-        os.rename(filepath+"!", filepath)
+        print 'ok'
+        return
+    if not merge:
+        print "not Merge?"
+        return
+    if ext == 'flv':
+        from flv_join import concat_flvs
+        concat_flvs(files, pjoin(odir, title+'.flv'))
+        for f in files:
+            os.remove(f)
+    elif ext == 'mp4':
+        from mp4_join import concat_mp4s
+        concat_mp4s(files, pjoin(odir, title+'.mp4'))
+        for f in files:
+            os.remove(f)
     else:
-        files = []
-        multithread = []
-        print 'Downloading %s.%s ...' % (title, ext)
-        tmp_path = pjoin(output_dir, '.dlvideo')
-        if not os.path.isdir(tmp_path):
-            os.mkdir(tmp_path)
-        for i, url in enumerate(urls):
-            filename = '%s[%02d].%s' % (title, i, ext)
-            filepath = pjoin(tmp_path, filename)
-            files.append(filepath)
-            print "[url] ", url
-            multithread.append(DownloadThread(url, filepath, refer))
-        for t in multithread:
-            t.join()
-        if not merge:
-            print "not Merge?"
-            return
-        if ext == 'flv':
-            from flv_join import concat_flvs
-            concat_flvs(files, pjoin(output_dir, title+'.flv'))
-            for f in files:
-                os.remove(f)
-        elif ext == 'mp4':
-            from mp4_join import concat_mp4s
-            concat_mp4s(files, pjoin(output_dir, title+'.mp4'))
-            for f in files:
-                os.remove(f)
-        else:
-            print "Can't join %s files" % ext
-            os.system('say "Can\'t join %s files"' % ext)
+        print "Can't join %s files" % ext
+        os.system('say "Can\'t join %s files"' % ext)
 
 def playlist_not_supported(name):
     def f(*args, **kwargs):
         raise NotImplementedError('Play list is not supported for '+name)
     return f
 
-class DownloadThread:
-    def __init__(self, url, filepath, refer=None):
-        self.url = url
-        self.filepath = filepath
-        self.refer = refer
-        self.thread = threading.Thread(target=self._run)
-        self.join = self.thread.join
-        self.thread.start()
-    def _run(self,*_args, **_kwargs):
-        if os.path.isfile(self.filepath):
-            print "[Already done, abort] ", self.filepath
-            return
-        _dl_methods(self.url, self.filepath+"!", self.refer)
-        os.rename(self.filepath+"!", self.filepath)
+# class DownloadThread:
+#     def __init__(self, url, file_path, n_perfile=10, refer=None):
+#         self.url = url
+#         self.file_path = file_path
+#         self.n_perfile = n_perfile
+#         self.refer = refer
+#         self.thread = threading.Thread(target=self._run)
+#         self.join = self.thread.join
+#         self.thread.start()
+#     def _run(self,*_args, **_kwargs):
+#         _dl_methods(url=self.url, out=self.file_path,
+#                     n_perfile=self.n_perfile, refer=self.refer)
 
 class Wget:
     def __init__(self):

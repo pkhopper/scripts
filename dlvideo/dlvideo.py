@@ -53,7 +53,7 @@ def dl_u2b(url, argv):
     print '==>', cmd
     os.system(cmd)
 
-def dl_other(url):
+def dl_youkulixian(url):
     cmd = config.cmd
     os.chdir(config.out_dir)
     cmd += r' "%s"' % url
@@ -101,7 +101,7 @@ def dl_m3u(m3ufile):
         os.mkdir(output_dir)
     dl_urls(urls, title)
 
-def dl_from_flvcd(url):
+def dl_flvcd(url):
     import urllib
     from re import findall
     from vavava.httputil import HttpUtil
@@ -126,10 +126,8 @@ def dl_urls(urls, title, refer=None):
     ext = 'flv'
     if urllist[0].find('mp4') > 0:
         ext = 'mp4'
-    size = 1024*1024*100
-    merge = True
-    download_urls(urllist, title, ext, total_size=size,
-                  output_dir=config.out_dir, refer=refer, merge=merge)
+    download_urls(urllist, title, ext, odir=config.out_dir,
+                  nthread=10, nperfile=True, refer=refer, merge=True)
 
 def dl_dispatch(url, is_m3u=False):
     if is_m3u:
@@ -143,9 +141,9 @@ def dl_dispatch(url, is_m3u=False):
             lambda x: re.findall(r'(?P<as>[^\\/\.]*\.[^\\/\.]*)[\\|/]', x.lower())[0]
         site = available_4flvcd(url)
         if site not in config.flvcd or config.flvcd[site]:
-            dl_from_flvcd(url)
+            dl_flvcd(url)
         else:
-            dl_other(url)
+            dl_youkulixian(url)
 
 def useage():
     print """\
