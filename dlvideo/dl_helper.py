@@ -66,9 +66,10 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
     print '[============ n=%d ================]'%(len(urls))
     for i, url in enumerate(urls):
         filename = '%s[%02d].%s' % (title, i, ext)
-        files.append(pjoin(tmp_path, filename))
+        tmp_file = pjoin(tmp_path, filename)
+        files.append(tmp_file)
         print '[download] %s'%(url)
-        dl_methods(url, vfile, refer=refer, nthread=10, nperfile=True)
+        dl_methods(url, tmp_file, refer=refer, nthread=10, nperfile=True)
     if len(urls) == 1:
         print 'ok'
         return
@@ -77,17 +78,16 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
         return
     if ext == 'flv':
         from flv_join import concat_flvs
-        concat_flvs(files, pjoin(odir, title+'.flv'))
-        for f in files:
-            os.remove(f)
+        concat = concat_flvs
     elif ext == 'mp4':
         from mp4_join import concat_mp4s
-        concat_mp4s(files, pjoin(odir, title+'.mp4'))
-        for f in files:
-            os.remove(f)
+        concat = concat_mp4s
     else:
         print "Can't join %s files" % ext
-        os.system('say "Can\'t join %s files"' % ext)
+        return
+    concat(files, pjoin(odir, vfile))
+    for f in files:
+        os.remove(f)
 
 def playlist_not_supported(name):
     def f(*args, **kwargs):
