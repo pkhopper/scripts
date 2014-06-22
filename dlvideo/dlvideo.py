@@ -113,8 +113,13 @@ def dl_flvcd(url):
     http = HttpUtil()
     http.add_header('Referer', parse_url)
     html = http.get(parse_url).decode('gb2312')
-    m3u = findall(r'name="inf" value="(?P<as>[^"]*)"', html)[0]
-    title = findall(u'<strong>当前解析视频：</strong>(?P<as>[^<]*)<strong>', html)[0]
+    try:
+        m3u = findall(r'name="inf" value="(?P<as>[^"]*)"', html)[0]
+        title = findall(u'<strong>当前解析视频：</strong>(?P<as>[^<]*)<strong>', html)[0]
+    except:
+        print 'not support'
+        os.system('say "not support."')
+        return
     title = title.strip()
     dl_urls(urls=[url for url in m3u.split('|')], title=title, refer=url)
 
@@ -126,8 +131,9 @@ def dl_urls(urls, title, refer=None):
     ext = 'flv'
     if urllist[0].find('mp4') > 0:
         ext = 'mp4'
-    download_urls(urllist, title, ext, odir=config.out_dir,
+    result = download_urls(urllist, title, ext, odir=config.out_dir,
                   nthread=10, nperfile=True, refer=refer, merge=True)
+    return result
 
 def dl_dispatch(url, is_m3u=False):
     if is_m3u:

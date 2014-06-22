@@ -88,9 +88,12 @@ class M3u8:
         m3u8 = self.http.get(url)
         urls = m3u8.splitlines(False)
         for url in urls:
-            if not url.startswith('#'):
+            if url.strip() == '':
+                continue
+            elif not url.startswith('#'):
                 LOG.debug('[m3u8_iner_url] %s', url)
-                url = urllib.basejoin(url_base, url)
+                if not url.startswith('http'):
+                    url = urllib.basejoin(url_base, url)
                 if url.endswith('.m3u8'):
                     return self._get_index(url, url_base)
                 results.append(url)
@@ -125,10 +128,8 @@ class M3u8:
             count, total, TARGETDURATION = self._dl_1(url, url_base, duration, ofp)
             wait = (total - count)*TARGETDURATION - (time.time() - t1)
             LOG.debug('sleep==> %s', wait)
-            if wait > 0:
-                sleep(wait)
-            else:
-                LOG.error('wait=%d', wait)
+            if wait > 10:
+                sleep(10)
 
 class DownloadLiveStream:
 
@@ -139,7 +140,7 @@ class DownloadLiveStream:
         self.odir = out_dir
         self.start = time.time()
         self.http = HttpUtil(charset="utf-8", timeout=10)
-        self.http.add_header('Referer', self.url_base)
+        # self.http.add_header('Referer', self.url_base)
         if config.proxy_enable:
             self.http.set_proxy({'http': config.proxy_addr})
         self.m3u8 = M3u8(self.http)
@@ -157,22 +158,12 @@ class DownloadLiveStream:
         return info.type.find('url') > 0
 
     def _recode(self, url, duration, ofp):
-        if url.endswith('.m3u8') or self._is_url_file(url):
-            self.m3u8.dl(url, self.url_base, duration, ofp)
-        else:
-            self._dl_ts(url, duration, ofp)
-
-    def recode(self, url, duration, output):
-        self._init(url, duration, output)
-        LOG.info("===>start: %s", util.get_time_string())
-        LOG.info("===>url: %s", url)
-        LOG.info("===>duration: %d", duration)
-        self.outfile = pjoin(self.odir, util.get_time_string() + ".ts")
-        LOG.info("===>output: %s", self.outfile)
-        ofp = open(self.outfile, 'w')
         try:
-            self._recode(self.url, duration, ofp)
-            LOG.info("===>stopped %s", util.get_time_string())
+            if url.find('m3u8') > 0 or self._is_url_file(url):
+                self.m3u8.dl(url, self.url_base, duration, ofp)
+            else:
+                self._dl_ts(url, duration, ofp)
+            return None, None, None
         except KeyboardInterrupt as e:
             LOG.info('===>stopped by user: %s', self.outfile)
             raise e
@@ -187,7 +178,20 @@ class DownloadLiveStream:
                 exit(0)
             if new_duration >= 0:
                 LOG.info('===>exception happened, restart ...')
-                self._recode(url, duration, ofp)
+                # self._recode(url, duration, ofp)
+                return url, duration, ofp
+
+    def recode(self, url, duration, output):
+        self._init(url, duration, output)
+        LOG.info("===>start: %s", util.get_time_string())
+        LOG.info("===>url: %s", url)
+        LOG.info("===>duration: %d", duration)
+        self.outfile = pjoin(self.odir, util.get_time_string() + ".ts")
+        LOG.info("===>output: %s", self.outfile)
+        ofp = open(self.outfile, 'w')
+        while duration is not None:
+            _, duration, _ = self._recode(self.url, duration, ofp)
+        LOG.info("===>stopped %s", util.get_time_string())
 
 def interact():
     LOG.info('===>interact mode')
@@ -217,10 +221,10 @@ def useage():
 def main():
     import getopt
     import sys
-    channel = None
+    channel_url = None
     duration = 0
     path = os.path.join(os.environ['HOME'], 'Downloads')
-    opts, args = getopt.getopt(sys.argv[1:], "d:f:o:lhi")
+    opts, args = getopt.getopt(sys.argv[1:], "u:d:f:o:lhi")
     for k, v in opts:
         if k in ("-d"):
             duration = float(v)
@@ -235,25 +239,27 @@ def main():
         elif k in ("-f"):
             for f in config.favorites:
                 if f[0] == v:
-                    channel = f[1]
-            if channel is None:
+                    channel_url = f[1]
+            if channel_url is None:
                 raise 'asdfadfas'
+        elif k in ("-u"):
+            channel_url = v
         elif k in ("-l"):
             script_path = util.get_file_path(__file__)
             os.system('python %s/xbmc_5ivdo.py -t 直播 > %s'%(
                 script_path, config.address_file)
             )
             exit(0)
-    if channel:
+    if channel_url:
         pass
     elif len(args) > 0:
-        channel = get_channel_url(args[0])[0]
+        channel_url = get_channel_url(args[0])[0]
     else:
-        channel = config.live_url
-    LOG.debug('>>>>>>>>>>>>>>> %s >>>>>>>>>>>>>>>', channel)
+        channel_url = config.live_url
+    LOG.debug('>>>>>>>>>>>>>>> %s >>>>>>>>>>>>>>>', channel_url)
     LOG.debug('>>>>>>>>>>>>>>> %s ', path)
     LOG.debug('>>>>>>>>>>>>>>> %s ', duration)
-    DownloadLiveStream().recode(channel, duration, path)
+    DownloadLiveStream().recode(channel_url, duration, path)
 
 if __name__ == "__main__":
     try:

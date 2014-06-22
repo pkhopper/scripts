@@ -35,17 +35,19 @@ def dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
         return
     # 3 methods to download url
     tmp_file = vfile + '!'
+    result = 0
     if not nperfile:
         # 1:
-        Wget().get(url=url, out=tmp_file, referer=refer)
+        result = Wget().get(url=url, out=tmp_file, referer=refer)
     else:
         # 2:
-        Axel().get(url=url, out=tmp_file, n=nthread, referer=refer)
+        result = Axel().get(url=url, out=tmp_file, n=nthread, referer=refer)
     # 3
     # print 'Downloading %s ...' % filename
     # url_save(url, tmp_file, bar, refer=refer)
     # bar.done()
     os.rename(tmp_file, vfile)
+    return result
 
 
 def download_urls(urls, title, ext, odir='.', nthread=10,
@@ -121,7 +123,7 @@ class Wget:
         cmd += " '%s'"%(url)
         print cmd
         import os
-        os.system(cmd)
+        return os.system(cmd)
 
 
 class Axel:
@@ -141,7 +143,7 @@ class Axel:
         cmd += " '%s'"%(url)
         print cmd
         import os
-        os.system(cmd)
+        return os.system(cmd)
 
     def gets(self, urls, out=None, n=None, referer=None):
         cmd = "axel -v -a -U '%s'"%(self.useragent)
@@ -155,7 +157,7 @@ class Axel:
             cmd += " '%s'"%(url)
         print cmd
         import os
-        os.system(cmd)
+        return os.system(cmd)
 
 if __name__ == '__main__':
     pass
