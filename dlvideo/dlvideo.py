@@ -33,7 +33,7 @@ class Config:
         self.flvcd = {}
         for k,v in cfg.items('flvcd'):
             self.flvcd[k] = v.lower() == 'true'
-config = Config()
+config = None
 
 # sys.path.insert(0, config.lib_dir)
 # common = __import__('common')
@@ -151,29 +151,33 @@ def dl_dispatch(url, is_m3u=False):
         else:
             dl_youkulixian(url)
 
-def useage():
-    print """\
-    dllive -f super|normal
-    dllive -o output_path
-    """
+def parse_args(config_file=None):
+    usage = """./dlvideo [-m][-c config][-o output][-f format] url1 url2 ..."""
+    if config_file:
+        config = Config(config_file)
+    else:
+        config = Config('config.ini')
+    import argparse
+    parser=argparse.ArgumentParser(usage=usage, description='download net video', version='0.1')
+    parser.add_argument('urls', nargs='+', help='urls')
+    parser.add_argument('-c', '--config', default='config.ini')
+    parser.add_argument('-m', '--m3u8', action='store_true', default=False)
+    parser.add_argument('-o', '--odir')
+    parser.add_argument('-f', '--format', help='video format:super, normal',choices=['super', 'normal'])
+    args = parser.parse_args()
+    if not config_file and abspath(args.config) != abspath('config.ini'):
+        return parse_args(args.config)
+    print 'args===>{}'.format(args)
+    return args
 
 def main():
-    import getopt
-    is_m3u = False
-    opts, args = getopt.getopt(sys.argv[1:], "f:o:hm")
-    for k, v in opts:
-        if k in ("-f"):
-            config.format = v
-        elif k in ("-m"):
-            is_m3u = True
-        elif k in ("-o"):
-            config.out_dir = v
-        elif k in ("-h"):
-            useage()
-            exit(0)
-    urls = args
-    for url in urls:
-        dl_dispatch(url, is_m3u)
+    args = parse_args()
+    if args.odir:
+        config.out_dir = args.odir
+    if args.format:
+        config.format = args.format
+    for url in args.urls:
+        dl_dispatch(url, args.m3u8)
 
 if __name__ == "__main__":
     # signal_handler = util.SignalHandlerBase()
@@ -183,7 +187,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt as e:
         print 'stop by user'
         exit(0)
-    except Exception, e:
+    except Exception as e:
         os.system(r'say "download failed!!"')
         raise
     finally:

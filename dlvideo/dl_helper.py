@@ -3,6 +3,7 @@
 
 import os
 import sys
+import shutil
 from vavava import util
 util.set_default_utf8()
 
@@ -66,15 +67,16 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
     for url in urls:
         print "[url] ", url
     print '[============ n=%d ================]'%(len(urls))
-    for i, url in enumerate(urls):
-        filename = '%s[%02d].%s' % (title, i, ext)
-        tmp_file = pjoin(tmp_path, filename)
-        files.append(tmp_file)
-        print '[download] %s'%(url)
-        dl_methods(url, tmp_file, refer=refer, nthread=10, nperfile=True)
     if len(urls) == 1:
+        dl_methods(urls[0], vfile=vfile, refer=refer, nthread=10, nperfile=True)
         print 'ok'
         return
+    for i, url in enumerate(urls):
+        filename = '%s[%02d-%02d].%s' % (title, len(urls), i, ext)
+        tmp_file = pjoin(tmp_path, filename)
+        files.append(tmp_file)
+        print '[dl] %s'%(url)
+        dl_methods(url, tmp_file, refer=refer, nthread=10, nperfile=True)
     if not merge:
         print "not Merge?"
         return
@@ -114,12 +116,16 @@ class Wget:
         reload(sys)
         sys.setdefaultencoding('utf-8')
         self.useragent = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.149 Safari/537.36'
-    def get(self, url, out=None, referer=None):
+    def get(self, url, out=None, referer=None, proxy=None):
         cmd = "wget -c --user-agent='%s'"%(self.useragent)
         if referer:
             cmd += " --referer='%s'"%(referer)
         if out:
             cmd += " --output-document='%s'"%(out)
+        if proxy:
+            pass
+        else:
+            cmd += " --no-proxy"
         cmd += " '%s'"%(url)
         print cmd
         import os
