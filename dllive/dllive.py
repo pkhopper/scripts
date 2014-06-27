@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import urllib
+import urllib2
 import re
 from time import sleep
 
@@ -56,9 +57,9 @@ util.set_default_utf8()
 LOG = util.get_logger(config.log_file, config.log_level)
 CHARSET = "utf-8"
 
-def get_channel_url(name):
+def get_channel_url(name, addr_file):
     urls = []
-    channels = open(config.address_file, 'r').readlines()
+    channels = open(addr_file, 'r').readlines()
     for channel in channels:
         info = channel.split('#')
         if len(info) < 2:
@@ -80,9 +81,9 @@ class M3u8:
         self.http = http
         self.old_ts_filter = dict()
 
-    def _get_index(self, url, url_base=None):
+    def get_m3u8(self, url, url_base=None):
         results = []
-        TARGETDURATION = 2
+        targetduration = 2
         if url_base is None:
             url_base = re.match('(^http[s]?://.*/)', url).group(0)
         m3u8 = self.http.get(url)
@@ -95,15 +96,15 @@ class M3u8:
                 if not url.startswith('http'):
                     url = urllib.basejoin(url_base, url)
                 if url.endswith('.m3u8'):
-                    return self._get_index(url, url_base)
+                    return self.get_m3u8(url, url_base)
                 results.append(url)
             elif url.lower().find('targetduration') > 0:
-                TARGETDURATION = int(url.split(':')[1])
-                LOG.debug('TARGETDURATION=%s', TARGETDURATION)
-        return results, TARGETDURATION
+                targetduration = int(url.split(':')[1])
+                LOG.debug('targetduration=%s', targetduration)
+        return results, targetduration
 
-    def _dl_1(self, url, url_base, duration, ofp):
-        urls, TARGETDURATION = self._get_index(url, url_base)
+    def _dl_stream(self, url, url_base, duration, ofp):
+        urls, targetduration = self.get_m3u8(url, url_base)
         count = 0
         for url in urls:
             if not self.old_ts_filter.has_key(url):
@@ -112,9 +113,9 @@ class M3u8:
                 self.http.fetch(url, download_handle)
                 self.old_ts_filter[url] = ''
                 count += 1
-        return count, len(urls), TARGETDURATION
+        return count, len(urls), targetduration
 
-    def dl(self, url, url_base, duration, ofp):
+    def dl_stream(self, url, url_base, duration, ofp):
         start = time.time()
         stop = 0
         if duration > 0:
@@ -125,28 +126,27 @@ class M3u8:
             if duration > 0 and tt < 0:
                 break
             t1 = time.time()
-            count, total, TARGETDURATION = self._dl_1(url, url_base, duration, ofp)
-            wait = (total - count)*TARGETDURATION - (time.time() - t1)
+            count, total, targetduration = self._dl_stream(url, url_base, duration, ofp)
+            wait = (total - count)*targetduration - (time.time() - t1)
             LOG.debug('sleep==> %s', wait)
-            if wait > 10:
-                sleep(10)
+            if wait > 5:
+                sleep(5)
 
 class DownloadLiveStream:
 
-    def _init(self, live_url, duration, out_dir):
+    def pre_record(self, live_url, duration, out_dir, proxy=None):
         self.url = live_url.strip(' \n')
         self.url_base = filter_host(self.url)
         self.duration = duration
         self.odir = out_dir
         self.start = time.time()
         self.http = HttpUtil(charset="utf-8", timeout=10)
-        # self.http.add_header('Referer', self.url_base)
-        if config.proxy_enable:
-            self.http.set_proxy({'http': config.proxy_addr})
+        if proxy:
+            self.http.set_proxy({'http': proxy})
         self.m3u8 = M3u8(self.http)
 
     def _dl_ts(self, url, duration, ofp):
-        LOG.debug('dl ts: %s', url)
+        LOG.debug('dl_stream ts: %s', url)
         download_handle = DownloadStreamHandler(ofp, duration)
         self.http.fetch(url, download_handle)
 
@@ -158,17 +158,27 @@ class DownloadLiveStream:
         return info.type.find('url') > 0
 
     def _recode(self, url, duration, ofp):
+        except_trace = None
         try:
             if url.find('m3u8') > 0 or self._is_url_file(url):
-                self.m3u8.dl(url, self.url_base, duration, ofp)
+                self.m3u8.dl_stream(url, self.url_base, duration, ofp)
             else:
                 self._dl_ts(url, duration, ofp)
             return None, None, None
         except KeyboardInterrupt as e:
-            LOG.info('===>stopped by user: %s', self.outfile)
-            raise e
+            except_trace = e
+        except urllib2.URLError as e:
+            except_trace = e
         except Exception as e:
-            LOG.exception(e)
+            except_trace = e
+        finally:
+            if isinstance(except_trace, KeyboardInterrupt):
+                LOG.info('===>stopped by user: %s', self.outfile)
+                raise except_trace
+            elif isinstance(except_trace, urllib2.URLError):
+                LOG.error('offline')
+                time.sleep(2)
+            LOG.exception(except_trace)
             if duration == 0:
                 new_duration = 0
             else:
@@ -178,25 +188,25 @@ class DownloadLiveStream:
                 exit(0)
             if new_duration >= 0:
                 LOG.info('===>exception happened, restart ...')
-                # self._recode(url, duration, ofp)
                 return url, duration, ofp
 
-    def recode(self, url, duration, output):
-        self._init(url, duration, output)
+    def recode(self, url, duration, output, proxy=None):
+        self.pre_record(url, duration, output, proxy)
         LOG.info("===>start: %s", util.get_time_string())
         LOG.info("===>url: %s", url)
         LOG.info("===>duration: %d", duration)
+        util.assure_path(self.odir)
         self.outfile = pjoin(self.odir, util.get_time_string() + ".ts")
         LOG.info("===>output: %s", self.outfile)
-        ofp = open(self.outfile, 'w')
+        ofp = open(self.outfile, 'a+')
         while duration is not None:
             _, duration, _ = self._recode(self.url, duration, ofp)
         LOG.info("===>stopped %s", util.get_time_string())
 
-def interact():
+def interact(duration, out_dir, address_file, proxy=None):
     LOG.info('===>interact mode')
     channel = raw_input('channel?')
-    address = open(config.address_file, 'r').readlines()
+    address = open(address_file, 'r').readlines()
     sub_addr = dict()
     for addr in address:
         kv = addr.split('#')
@@ -209,57 +219,54 @@ def interact():
         channel_list.append(k)
         print '[%2d] %s  %s'%(index, k, v)
     channel_id = int(raw_input('id? ')) - 1
-    DownloadLiveStream().recode(sub_addr[channel_list[channel_id]], config.duration, config.out_dir)
+    DownloadLiveStream().recode(sub_addr[channel_list[channel_id]], duration, out_dir)
 
-def useage():
-    print """\
-    dllive [-d duration] [-f favorites] [-o output_path]
-    dllive -l
-    dllive -i
-    """
+def parse_args(config_file=None):
+    usage = """./dllive [-i|l][-c config][-o out_put_path][-f favorite][-d duration]"""
+    if config_file:
+        config = Config(config_file)
+    else:
+        config = Config('config.ini')
+    import argparse
+    parser=argparse.ArgumentParser(usage=usage, description='download live stream', version='0.1')
+    parser.add_argument('-c', '--config', default='config.ini')
+    parser.add_argument('-d', '--duration', type=float, default=config.duration)
+    parser.add_argument('-o', '--out-path', dest='out_dir', default=config.out_dir)
+    parser.add_argument('-p', '--proxy', dest='proxy', action='store_const', const=True, help='http/https proxy')
+    parser.add_argument('-i', '--interactive', action='store_const', dest='interactive', const=True, help='interactive mode.')
+    parser.add_argument('-u', '--url', dest='url', help='live stream url')
+    parser.add_argument('-f', '--favorite', dest='favorite', help='favorite channel name, define in config file.')
+    parser.add_argument('-l', '--channel-list', dest='channellist', action='store_const', const=True, help='update addresses.')
+    args = parser.parse_args()
+    if not config_file and abspath(args.config) != abspath('config.ini'):
+        return parse_args(args.config)
+    LOG.debug('args===>{}'.format(args))
+    return args
 
 def main():
-    import getopt
-    import sys
-    channel_url = None
-    duration = 0
-    path = os.path.join(os.environ['HOME'], 'Downloads')
-    opts, args = getopt.getopt(sys.argv[1:], "u:d:f:o:lhi")
-    for k, v in opts:
-        if k in ("-d"):
-            duration = float(v)
-        elif k in ("-h"):
-            useage()
-            exit(0)
-        elif k in ("-i"):
-            interact()
-            exit(0)
-        elif k in ("-o"):
-            path = os.path.abspath(v)
-        elif k in ("-f"):
-            for f in config.favorites:
-                if f[0] == v:
-                    channel_url = f[1]
-            if channel_url is None:
-                raise 'asdfadfas'
-        elif k in ("-u"):
-            channel_url = v
-        elif k in ("-l"):
-            script_path = util.get_file_path(__file__)
-            os.system('python %s/xbmc_5ivdo.py -t 直播 > %s'%(
-                script_path, config.address_file)
-            )
-            exit(0)
-    if channel_url:
-        pass
-    elif len(args) > 0:
-        channel_url = get_channel_url(args[0])[0]
-    else:
-        channel_url = config.live_url
-    LOG.debug('>>>>>>>>>>>>>>> %s >>>>>>>>>>>>>>>', channel_url)
-    LOG.debug('>>>>>>>>>>>>>>> %s ', path)
-    LOG.debug('>>>>>>>>>>>>>>> %s ', duration)
-    DownloadLiveStream().recode(channel_url, duration, path)
+    args = parse_args()
+    live_url = config.live_url
+    proxy = None
+    if args.proxy:
+        proxy = config.proxy_addr
+    if args.interactive:
+        interact(duration=args.duration, out_dir=args.out_dir,
+                 address_file=config.address_file, proxy=proxy)
+        return
+    elif args.channellist:
+        script_path = util.get_file_path(__file__)
+        os.system('python %s/xbmc_5ivdo.py -t 直播 > %s'%(
+            script_path, config.address_file)
+        )
+        return
+    elif args.favorite:
+        for favorite in config.favorites:
+            if favorite[0] == args.favorite:
+                live_url = favorite[0]
+                break
+
+    DownloadLiveStream().recode(url=live_url, duration=args.duration,
+                                output=args.out_dir, proxy=proxy)
 
 if __name__ == "__main__":
     try:
