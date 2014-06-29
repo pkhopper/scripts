@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+import datetime
 import os
 pjoin = os.path.join
 dirname = os.path.dirname
 abspath = os.path.abspath
 user_path = os.environ['HOME']
+
+import util
 
 class Config:
     def __init__(self, config='config.ini'):
@@ -66,8 +69,9 @@ class MyWeibo:
             )
         self.screen_name = self.client.users.show.get(uid=self.cfg.uid)['screen_name']
 
-    def get_pub_timeline(self):
-        return self.client.statuses.public_timeline.get().statuses
+    def get_friends_timeline(self):
+        result = self.client.statuses.friends_timeline.get()
+        return result
 
     def post(self, msg, pic_file=None):
         if pic_file:
@@ -77,15 +81,40 @@ class MyWeibo:
         self.client.statuses.upload.post(status=msg, pic=pic)
 
 ###########
-def display_public_timeline(weibo):
-    for pos, status in enumerate(weibo.get_pub_timeline()):
-        print '[%03d] %s' % (pos, status.created_at)
+def parse_uc_date(str):
+    MONTHS   = [("Jan", "January"),
+                ("Feb", "February"),
+                ("Mar", "March"),
+                ("Apr", "April"),
+                ("May", "May"),
+                ("Jun", "June"),
+                ("Jul", "July"),
+                ("Aug", "August"),
+                ("Sep", "September"),
+                ("Oct", "October"),
+                ("Nov", "November"),
+                ("Dec", "December")]
+    for month in MONTHS:
+        if str.find(month[0]) > 0:
+            str =str.replace(month[0], month[1])
+    format = '%a %B %d %H:%M:%S +0800 %Y'
+    date = datetime.datetime.strptime(str, format)
+    return date - datetime.timedelta(hours=8)
+
+def display_friends_timeline(weibo):
+    timeline = weibo.get_friends_timeline()
+    pos = len(timeline.statuses)
+    for status in reversed(timeline.statuses):
+        pos -= 1
+        print '[%03d] %s %s' % (pos, status.user.screen_name,
+            util.nice_date(parse_uc_date(status.created_at)))
         print '\t%s' % (status.text)
+        print '\thttp://www.weibo.com/{}/{}'.format(
+            status.user.idstr, util.mid_to_url(status.mid))
 
 def statuses(weibo):
     status = weibo.client.statuses
     print status
-
 
 def test(weibo):
     print weibo.screen_name
@@ -108,4 +137,4 @@ if __name__ == "__main__":
     weibo.login()
     test(weibo)
     # statuses(weibo)
-    display_public_timeline(weibo)
+    display_friends_timeline(weibo)
