@@ -84,7 +84,9 @@ def dl_m3u(m3ufile):
     if not m3ufile:
         m3ufile = search_m3u(out_dir)
     urls = []
-    for url in open(m3ufile, 'r').readlines():
+    with open(m3ufile, 'r') as content:
+        lines = content.readlines()
+    for url in lines:
         url = url.strip()
         if not url.startswith('#'):
             urls.append(url)
@@ -168,10 +170,11 @@ def parse_args(config_file=None):
     if not config_file and abspath(args.config) != abspath('config.ini'):
         return parse_args(args.config)
     print 'args===>{}'.format(args)
-    return args
+    return args, config
 
 def main():
-    args = parse_args()
+    global config
+    args, config = parse_args()
     if args.odir:
         config.out_dir = args.odir
     if args.format:
