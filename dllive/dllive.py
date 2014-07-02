@@ -82,8 +82,8 @@ class M3u8:
         self.http = http
         self.old_ts_filter = dict()
 
-    def get_m3u8(self, url, url_base=None):
-        results = []
+    def get_curr_index(self, url, url_base=None):
+        lines = []
         targetduration = 2
         if url_base is None:
             url_base = re.match('(^http[s]?://.*/)', url).group(0)
@@ -97,15 +97,15 @@ class M3u8:
                 if not url.startswith('http'):
                     url = urllib.basejoin(url_base, url)
                 if url.endswith('.m3u8'):
-                    return self.get_m3u8(url, url_base)
-                results.append(url)
+                    return self.get_curr_index(url, url_base)
+                lines.append(url)
             elif url.lower().find('targetduration') > 0:
                 targetduration = int(url.split(':')[1])
-                LOG.debug('targetduration=%s', targetduration)
-        return results, targetduration
+                LOG.debug('targetduration=%d', targetduration)
+        return lines, targetduration
 
-    def _dl_stream(self, url, url_base, duration, ofp):
-        urls, targetduration = self.get_m3u8(url, url_base)
+    def get_curr_stream(self, url, url_base, duration, ofp):
+        urls, targetduration = self.get_curr_index(url, url_base)
         count = 0
         for url in urls:
             if not self.old_ts_filter.has_key(url):
@@ -117,31 +117,35 @@ class M3u8:
         return count, len(urls), targetduration
 
     def dl_stream(self, url, url_base, duration, ofp):
-        start = time.time()
-        stop = total_duration = 0
-        if duration > 0:
-            stop = duration + start
+        start_time = time.time()
+        total_server = 0
+        stop_time = duration + start_time
         while True:
-            curr = time.time()
-            tt = stop - curr
-            if duration > 0 and tt < 0:
+            before = time.time()
+            count, total, targetduration = self.get_curr_stream(url, url_base, duration, ofp)
+            after = time.time()
+            time_transfer = after - before
+            server_duration = (total - count)*targetduration
+            time_buffered = server_duration - time_transfer
+            total_server += targetduration*count
+            total_local = after - start_time
+            # T=total;C=current;SD=server target duration;
+            LOG.debug('T:%.2f/%.2f(%.2f);C:%.2f/%.2f(%.2f);B=%.2f;SD=%.2f',
+                      total_local, total_server, total_server - total_local, time_transfer,
+                      server_duration, server_duration - time_transfer, time_buffered, targetduration)
+            if duration > 0 and stop_time - after < max(time_buffered, 0.01):
+                LOG.debug(r"===> time's up.")
                 break
-            t1 = time.time()
-            count, total, targetduration = self._dl_stream(url, url_base, duration, ofp)
-            wait = (total - count)*targetduration - (time.time() - t1)
-            total_duration += targetduration*count
-            total_real_duration = time.time()-start
-            LOG.debug('len:%.2f/%.2f(%.2f),sleep=%.2f', total_duration,
-                      total_real_duration, total_duration - total_real_duration, wait)
-            if wait > 10:
+            if time_buffered > 5:
                 sleep(10)
 
 class DownloadLiveStream:
 
-    def pre_record(self, live_url, duration, out_dir, proxy=None):
+    def __prepare(self, live_url, duration, out_dir, proxy=None):
         self.url = live_url.strip(' \n')
         self.url_base = filter_host(self.url)
         self.duration = duration
+        self.none_stop = duration == 0
         self.odir = out_dir
         self.start = time.time()
         self.http = HttpUtil(charset="utf-8", timeout=10)
@@ -149,64 +153,43 @@ class DownloadLiveStream:
             self.http.set_proxy({'http': proxy})
         self.m3u8 = M3u8(self.http)
 
-    def dl_stream_ts(self, url, duration, ofp):
-        LOG.debug('dl_stream ts: %s', url)
-        download_handle = DownloadStreamHandler(ofp, duration)
-        self.http.fetch(url, download_handle)
-
-    def _is_url_file(self, url):
+    def __is_url_file(self, url):
         import urllib2
         req = urllib2.Request(url)
         resp = urllib2.urlopen(req)
         info = resp.info()
         return info.type.find('url') > 0
 
-    def _recode(self, url, duration, ofp):
-        except_trace = None
-        try:
-            if url.find('m3u8') > 0 or self._is_url_file(url):
-                self.m3u8.dl_stream(url, self.url_base, duration, ofp)
-            else:
-                self.dl_stream_ts(url, duration, ofp)
-            return None, None, None
-        except KeyboardInterrupt as e:
-            except_trace = e
-        except urllib2.URLError as e:
-            except_trace = e
-        except Exception as e:
-            except_trace = e
-        finally:
-            if isinstance(except_trace, KeyboardInterrupt):
-                LOG.info('===>stopped by user: %s', self.outfile)
-                return None, None, None
-            elif isinstance(except_trace, urllib2.URLError):
-                LOG.error('offline, retry in 2 seconds.')
+    def __recode(self, url, duration, ofp):
+        self.start = time.time()
+        self.stop = self.start + duration
+        while duration == 0 or time.time() < self.stop:
+            try:
+                if url.find('m3u8') > 0 or self.__is_url_file(url):
+                    LOG.debug('dl_stream m3u8: %s', url)
+                    return self.m3u8.dl_stream(url, self.url_base, duration, ofp)
+                else:
+                    LOG.debug('dl_stream ts: %s', url)
+                    self.http.fetch(url, DownloadStreamHandler(ofp, duration))
+            except KeyboardInterrupt as e:
+                raise e
+            except urllib2.URLError as e:
+                LOG.exception(e)
+                LOG.error('===> offline, retry in 2 seconds. <===')
                 time.sleep(2)
-            LOG.exception(except_trace)
-            if duration == 0:
-                new_duration = 0
-            else:
-                new_duration = duration - (time.time() - self.start)
-            if duration > 0 and new_duration <= 0:
-                LOG.info("===>stopped, but exception happened. %s", util.get_time_string())
-                exit(0)
-            if new_duration >= 0:
-                LOG.info('===>exception happened, restart ...')
-                return url, duration, ofp
+            except Exception as e:
+                LOG.exception(e)
 
-    def recode(self, url, duration, output, proxy=None):
-        self.pre_record(url, duration, output, proxy)
-        start = time.time()
+    def recode(self, url, output, duration=0, proxy=None):
+        self.__prepare(url, duration, output, proxy)
         LOG.info("====>start: duration=%.2f, url=%s", duration, url)
         util.assure_path(self.odir)
         self.outfile = pjoin(self.odir, util.get_time_string() + ".ts")
         LOG.info("===> output: %s", self.outfile)
         with open(self.outfile, 'a+') as ofp:
-            new_duration = duration
-            while new_duration is not None:
-                _, new_duration, _ = self._recode(self.url, new_duration, ofp)
+            self.__recode(self.url, duration=duration, ofp=ofp)
         LOG.info("====>stopped (total=%.2fs,duration=%.2fs, out=%s)",
-                 time.time() - start, duration, self.outfile)
+                 time.time() - self.start, duration, self.outfile)
 
 def interact(duration, out_dir, address_file, proxy=None):
     LOG.info('===>interact mode')
@@ -273,8 +256,8 @@ def main():
     elif args.url:
         live_url = args.url
 
-    DownloadLiveStream().recode(url=live_url, duration=args.duration,
-                                output=args.out_dir, proxy=proxy)
+    DownloadLiveStream().recode(url=live_url, output=args.out_dir,
+                                duration=args.duration, proxy=proxy)
 
 if __name__ == "__main__":
     try:
