@@ -24,10 +24,11 @@ def to_native_string(s):
         return s
 
 def escape_file_path(path):
-    path = path.replace('/', '-')
-    path = path.replace('\\', '-')
-    path = path.replace('*', '-')
-    path = path.replace('?', '-')
+    path = path.replace('/', '_')
+    path = path.replace('\\', '_')
+    path = path.replace('*', '_')
+    path = path.replace('?', '_')
+    path = path.replace('\'', '_')
     return path
 
 def dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
@@ -56,42 +57,48 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
     assert urls
     assert ext in ('flv', 'mp4')
     title = to_native_string(title)
+    origin_title = title
     title = escape_file_path(title)
+    origin_title = '%s.%s' % (origin_title, ext)
     filename = '%s.%s' % (title, ext)
+    origin_title = pjoin(odir, origin_title)
     vfile = pjoin(odir, filename)
+    if os.path.exists(origin_title) or os.path.exists(vfile):
+        print 'out put file exists', origin_title
+        return
     files = []
     print 'Downloading %s.%s ...' % (title, ext)
     tmp_path = pjoin(odir, '.dlvideo')
-    if not os.path.isdir(tmp_path):
-        os.mkdir(tmp_path)
+    util.assure_path(tmp_path)
     for url in urls:
         print "[url] ", url
     print '[============ n=%d ================]'%(len(urls))
-    if len(urls) == 1:
+    if len(urls) > 1:
+        for i, url in enumerate(urls):
+            filename = '%s[%02d-%02d].%s' % (title, len(urls), i, ext)
+            tmp_file = pjoin(tmp_path, filename)
+            files.append(tmp_file)
+            print '[dl] %s'%(url)
+            dl_methods(url, tmp_file, refer=refer, nthread=10, nperfile=True)
+        if not merge:
+            print "not Merge?"
+            return
+        if ext == 'flv':
+            from flv_join import concat_flvs
+            concat = concat_flvs
+        elif ext == 'mp4':
+            from mp4_join import concat_mp4s
+            concat = concat_mp4s
+        else:
+            print "Can't join %s files" % ext
+            return
+        concat(files, pjoin(odir, vfile))
+        for f in files:
+            os.remove(f)
+    else:
         dl_methods(urls[0], vfile=vfile, refer=refer, nthread=10, nperfile=True)
         print 'ok'
-        return
-    for i, url in enumerate(urls):
-        filename = '%s[%02d-%02d].%s' % (title, len(urls), i, ext)
-        tmp_file = pjoin(tmp_path, filename)
-        files.append(tmp_file)
-        print '[dl] %s'%(url)
-        dl_methods(url, tmp_file, refer=refer, nthread=10, nperfile=True)
-    if not merge:
-        print "not Merge?"
-        return
-    if ext == 'flv':
-        from flv_join import concat_flvs
-        concat = concat_flvs
-    elif ext == 'mp4':
-        from mp4_join import concat_mp4s
-        concat = concat_mp4s
-    else:
-        print "Can't join %s files" % ext
-        return
-    concat(files, pjoin(odir, vfile))
-    for f in files:
-        os.remove(f)
+    os.rename(vfile, origin_title)
 
 def playlist_not_supported(name):
     def f(*args, **kwargs):

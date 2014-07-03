@@ -4,6 +4,7 @@
 import os
 import sys
 from vavava import util
+import play_list
 util.set_default_utf8()
 
 pjoin = os.path.join
@@ -165,12 +166,23 @@ def parse_args(config_file=None):
     parser.add_argument('-c', '--config', default='config.ini')
     parser.add_argument('-m', '--m3u8', action='store_true', default=False)
     parser.add_argument('-o', '--odir')
+    parser.add_argument('--list-page', dest='list_page', action='store_true')
+    parser.add_argument('--list-file', dest='list_file', action='store_true')
     parser.add_argument('-f', '--format', help='video format:super, normal',choices=['super', 'normal'])
     args = parser.parse_args()
     if not config_file and abspath(args.config) != abspath('config.ini'):
         return parse_args(args.config)
     print 'args===>{}'.format(args)
     return args, config
+
+def read_list_file(file_name):
+    urls = []
+    with open(file_name, 'r') as ofp:
+        lines = ofp.readlines()
+        for line in lines:
+            if not line.strip().startswith('#'):
+                urls.append(line)
+    return urls
 
 def main():
     global config
@@ -179,8 +191,22 @@ def main():
         config.out_dir = args.odir
     if args.format:
         config.format = args.format
+    if args.list_file:
+        args.urls = read_list_file(args.list_file)
+    if args.list_page:
+        args.urls = play_list.YoukuFilter().handle(args.urls[0])
+    url_failed = []
     for url in args.urls:
-        dl_dispatch(url, args.m3u8)
+        try:
+            dl_dispatch(url, args.m3u8)
+        except KeyboardInterrupt as e:
+            raise e
+        except Exception as e:
+            print 'exception happened:', e.message
+            print '[===> url=]', url
+            url_failed.append(url)
+    for url in url_failed:
+        print '[url failed] ', url
 
 if __name__ == "__main__":
     # signal_handler = util.SignalHandlerBase()

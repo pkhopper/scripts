@@ -4,6 +4,7 @@
 import sys
 import unittest
 import dlvideo
+import dl_helper
 
 argparse_cases = [
     ['url1', 'url2', 'url3', 'url4'],
@@ -18,9 +19,16 @@ class TestDlvideoCase(unittest.TestCase):
             print result
             self.assertEqual(result.urls, args[:4])
 
+class TestDl_helper(unittest.TestCase):
+    def test_dlhelper(self):
+        filename = """a\\b'c/d.test"""
+        result = dl_helper.escape_file_path(filename)
+        self.assertEqual(result, 'a_b_c_d.test')
+
 def suite():
     suite = unittest.TestSuite()
-    suite.addTest(TestDlvideoCase("testSize"))
+    # suite.addTest(TestDlvideoCase("testSize"))
+    suite.addTest(TestDl_helper())
     return suite
 
 if __name__ == "__main__":
