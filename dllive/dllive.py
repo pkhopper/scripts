@@ -9,21 +9,24 @@ import urllib2
 import re
 from time import sleep
 
-dirname = os.path.dirname
-abspath = os.path.abspath
 pjoin = os.path.join
-user_path = os.environ['HOME']
+pdirname = os.path.dirname
+pabspath = os.path.abspath
 
 class Config:
-    def __init__(self, config='config.ini'):
-        dump_path = lambda path: path.replace(r"%(home)s", user_path)
+    def __init__(self, config=None):
         if os.path.islink(__file__):
-            script_path = dirname(abspath(os.readlink(__file__)))
+            script_dir = pdirname(pabspath(os.readlink(__file__)))
         else:
-            script_path = dirname(abspath(__file__))
+            script_dir = pdirname(pabspath(__file__))
+        config_file = config
+        if config_file:
+            config_file = pabspath(config_file)
+        else:
+            config_file = pjoin(script_dir, config)
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
-        cfg.read(pjoin(script_path, config))
+        cfg.read(config_file)
         self.out_dir = cfg.get('default', 'out_dir')
         self.channel = cfg.get('default', 'channel')
         self.duration = cfg.getint('default', 'duration')
@@ -47,14 +50,14 @@ class Config:
         }
         if self.log_level:
             self.log_level = lvlconvert[self.log_level.strip().lower()]
-config = Config()
+config = None
+log = None
 
 sys.path.insert(0, config.pythonpath)
 from vavava.httputil import HttpUtil
 from vavava.httputil import DownloadStreamHandler
 from vavava import util
 util.set_default_utf8()
-LOG = util.get_logger(config.log_file, config.log_level)
 CHARSET = "utf-8"
 
 def get_channel_url(name, addr_file):
@@ -72,7 +75,7 @@ def get_channel_url(name, addr_file):
 
 def filter_host(url):
     if url.find('ifeng.com') > 0:
-        LOG.debug('ifeng.com filter: %s', url)
+        log.debug('ifeng.com filter: %s', url)
         return re.match('(^http[s]?://[^/?]*/)', url).group(0)
     else:
         return re.match('(^http[s]?://.*/)', url).group(0)
@@ -93,7 +96,7 @@ class M3u8:
             if url.strip() == '':
                 continue
             elif not url.startswith('#'):
-                LOG.debug('[m3u8_iner_url] %s', url)
+                log.debug('[m3u8_iner_url] %s', url)
                 if not url.startswith('http'):
                     url = urllib.basejoin(url_base, url)
                 if url.endswith('.m3u8'):
@@ -101,7 +104,7 @@ class M3u8:
                 lines.append(url)
             elif url.lower().find('targetduration') > 0:
                 targetduration = int(url.split(':')[1])
-                LOG.debug('targetduration=%d', targetduration)
+                log.debug('targetduration=%d', targetduration)
         return lines, targetduration
 
     def get_curr_stream(self, url, url_base, duration, ofp):
@@ -109,7 +112,7 @@ class M3u8:
         count = 0
         for url in urls:
             if not self.old_ts_filter.has_key(url):
-                LOG.debug('Download m3u8 ts: %s', url)
+                log.debug('Download m3u8 ts: %s', url)
                 download_handle = DownloadStreamHandler(ofp, duration)
                 self.http.fetch(url, download_handle)
                 self.old_ts_filter[url] = ''
@@ -130,11 +133,11 @@ class M3u8:
             total_server += targetduration*count
             total_local = after - start_time
             # T=total;C=current;SD=server target duration;
-            LOG.debug('T:%.2f/%.2f(%.2f);C:%.2f/%.2f(%.2f);B=%.2f;SD=%.2f',
+            log.debug('T:%.2f/%.2f(%.2f);C:%.2f/%.2f(%.2f);B=%.2f;SD=%.2f',
                       total_local, total_server, total_server - total_local, time_transfer,
                       server_duration, server_duration - time_transfer, time_buffered, targetduration)
             if duration > 0 and stop_time - after < max(time_buffered, 0.01):
-                LOG.debug(r"===> time's up.")
+                log.debug(r"===> time's up.")
                 break
             if time_buffered > 5:
                 sleep(10)
@@ -147,7 +150,6 @@ class DownloadLiveStream:
         self.duration = duration
         self.none_stop = duration == 0
         self.odir = out_dir
-        self.start = time.time()
         self.http = HttpUtil(charset="utf-8", timeout=10)
         if proxy:
             self.http.set_proxy({'http': proxy})
@@ -166,33 +168,33 @@ class DownloadLiveStream:
         while duration == 0 or time.time() < self.stop:
             try:
                 if url.find('m3u8') > 0 or self.__is_url_file(url):
-                    LOG.debug('dl_stream m3u8: %s', url)
+                    log.debug('dl_stream m3u8: %s', url)
                     return self.m3u8.dl_stream(url, self.url_base, duration, ofp)
                 else:
-                    LOG.debug('dl_stream ts: %s', url)
+                    log.debug('dl_stream ts: %s', url)
                     self.http.fetch(url, DownloadStreamHandler(ofp, duration))
             except KeyboardInterrupt as e:
                 raise e
             except urllib2.URLError as e:
-                LOG.exception(e)
-                LOG.error('===> offline, retry in 2 seconds. <===')
+                log.exception(e)
+                log.error('===> offline, retry in 2 seconds. <===')
                 time.sleep(2)
             except Exception as e:
-                LOG.exception(e)
+                log.exception(e)
 
     def recode(self, url, output, duration=0, proxy=None):
         self.__prepare(url, duration, output, proxy)
-        LOG.info("====>start: duration=%.2f, url=%s", duration, url)
+        log.info("====>start: duration=%.2f, url=%s", duration, url)
         util.assure_path(self.odir)
         self.outfile = pjoin(self.odir, util.get_time_string() + ".ts")
-        LOG.info("===> output: %s", self.outfile)
+        log.info("===> output: %s", self.outfile)
         with open(self.outfile, 'a+') as ofp:
             self.__recode(self.url, duration=duration, ofp=ofp)
-        LOG.info("====>stopped (total=%.2fs,duration=%.2fs, out=%s)",
+        log.info("====>stopped (total=%.2fs,duration=%.2fs, out=%s)",
                  time.time() - self.start, duration, self.outfile)
 
 def interact(duration, out_dir, address_file, proxy=None):
-    LOG.info('===>interact mode')
+    log.info('===>interact mode')
     channel = raw_input('channel?')
     with open(address_file, 'r') as fp:
         address = fp.readlines()
@@ -210,12 +212,8 @@ def interact(duration, out_dir, address_file, proxy=None):
     channel_id = int(raw_input('id? ')) - 1
     DownloadLiveStream().recode(sub_addr[channel_list[channel_id]], duration, out_dir)
 
-def parse_args(config_file=None):
+def parse_args():
     usage = """./dllive [-i|l][-c config][-o out_put_path][-f favorite][-d duration]"""
-    if config_file:
-        config = Config(config_file)
-    else:
-        config = Config('config.ini')
     import argparse
     parser=argparse.ArgumentParser(usage=usage, description='download live stream', version='0.1')
     parser.add_argument('-c', '--config', default='config.ini')
@@ -227,13 +225,23 @@ def parse_args(config_file=None):
     parser.add_argument('-f', '--favorite', dest='favorite', help='favorite channel name, define in config file.')
     parser.add_argument('-l', '--channel-list', dest='channellist', action='store_const', const=True, help='update addresses.')
     args = parser.parse_args()
-    if not config_file and abspath(args.config) != abspath('config.ini'):
-        return parse_args(args.config)
-    LOG.debug('args===>{}'.format(args))
+    print args
     return args
 
-def main():
+def init_args_config():
+    config = Config()
     args = parse_args()
+    if args.config != 'config.ini':
+        config = Config(config=args.config)
+        args = parse_args()
+    log = util.get_logger(logfile=config.log, level=config.log_level)
+    return args, config, log
+
+def main():
+    global log
+    global config
+    args, config, log = init_args_config()
+    log.info('{}'.format(args))
     live_url = config.live_url
     proxy = None
     if args.proxy:
@@ -265,4 +273,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt as e:
         print 'stop by user'
         exit(0)
-
