@@ -17,6 +17,8 @@ default_encoding = sys.getfilesystemencoding()
 if default_encoding.lower() == 'ascii':
     default_encoding = 'utf-8'
 
+log = util.get_logger()
+
 def to_native_string(s):
     if type(s) == unicode:
         return s.encode(default_encoding)
@@ -33,7 +35,7 @@ def escape_file_path(path):
 
 def dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
     if os.path.isfile(vfile):
-        print "[Already done, abort] ", vfile
+        log.info("[Already done, abort] %s", vfile)
         return
     # 3 methods to download url
     tmp_file = vfile + '!'
@@ -64,15 +66,12 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
     origin_title = pjoin(odir, origin_title)
     vfile = pjoin(odir, filename)
     if os.path.exists(origin_title) or os.path.exists(vfile):
-        print 'out put file exists', origin_title
+        log.info('out put file exists, %s', origin_title)
         return
     files = []
     print 'Downloading %s.%s ...' % (title, ext)
     tmp_path = pjoin(odir, '.dlvideo')
     util.assure_path(tmp_path)
-    for url in urls:
-        print "[url] ", url
-    print '[============ n=%d ================]'%(len(urls))
     if len(urls) > 1:
         for i, url in enumerate(urls):
             filename = '%s[%02d-%02d].%s' % (title, len(urls), i, ext)
@@ -80,21 +79,19 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
             files.append(tmp_file)
             print '[dl] %s'%(url)
             dl_methods(url, tmp_file, refer=refer, nthread=10, nperfile=True)
-        if not merge:
-            print "not Merge?"
-            return
-        if ext == 'flv':
-            from flv_join import concat_flvs
-            concat = concat_flvs
-        elif ext == 'mp4':
-            from mp4_join import concat_mp4s
-            concat = concat_mp4s
-        else:
-            print "Can't join %s files" % ext
-            return
-        concat(files, pjoin(odir, vfile))
-        for f in files:
-            os.remove(f)
+        if merge:
+            if ext == 'flv':
+                from flv_join import concat_flvs
+                concat = concat_flvs
+            elif ext == 'mp4':
+                from mp4_join import concat_mp4s
+                concat = concat_mp4s
+            else:
+                log.error("Can't join files: {}".format(files))
+                return
+            concat(files, vfile)
+            for f in files:
+                os.remove(f)
     else:
         dl_methods(urls[0], vfile=vfile, refer=refer, nthread=10, nperfile=True)
         print 'ok'

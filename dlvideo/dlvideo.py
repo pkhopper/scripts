@@ -8,22 +8,28 @@ import play_list
 util.set_default_utf8()
 
 pjoin = os.path.join
-dirname = os.path.dirname
-abspath = os.path.abspath
+pdirname = os.path.dirname
+pabspath = os.path.abspath
 user_path = os.environ['HOME']
 
 class Config:
-    def __init__(self, config='config.ini'):
-        dump_path = lambda path: path.replace(r"%(home)s", user_path)
+    def __init__(self, config=None):
         if os.path.islink(__file__):
-            curr_dir = dirname(abspath(os.readlink(__file__)))
+            script_dir = pdirname(pabspath(os.readlink(__file__)))
         else:
-            curr_dir = dirname(abspath(__file__))
+            script_dir = pdirname(pabspath(__file__))
+        config_file = config
+        if config_file:
+            config_file = pabspath(config_file)
+        else:
+            config_file = pjoin(script_dir, 'config.ini')
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
-        cfg.read(pjoin(curr_dir, config))
+        cfg.read(config_file)
         self.out_dir = cfg.get('default', 'out_dir')
         self.format = cfg.get('default', 'format')
+        self.log = cfg.get('default', 'log')
+        self.log_level = cfg.get('default', 'log_level')
         self.lib_dir = cfg.get('script', 'lib_dir')
         self.cmd = cfg.get('script', 'cmd')
         self.u2b_cmd = cfg.get('u2b', 'cmd')
@@ -34,14 +40,26 @@ class Config:
         self.flvcd = {}
         for k,v in cfg.items('flvcd'):
             self.flvcd[k] = v.lower() == 'true'
+        lvlconvert = {
+            'critical' : 50,
+            'fatal' : 50,
+            'error' : 40,
+            'warning' : 30,
+            'warn' : 30,
+            'info' : 20,
+            'debug' : 10,
+            'notset' : 0
+        }
+        if self.log_level:
+            self.log_level = lvlconvert[self.log_level.strip().lower()]
 config = None
+log = None
 
 # sys.path.insert(0, config.lib_dir)
 # common = __import__('common')
 # download_urls = common.download_urls
 import dl_helper
 download_urls = dl_helper.download_urls
-
 
 def dl_u2b(url, argv):
     cmd = config.u2b_cmd
@@ -51,7 +69,7 @@ def dl_u2b(url, argv):
     for arg in argv:
         cmd += ' ' + arg
     cmd += r' %s' % url
-    print '==>', cmd
+    log.debug('==> %s', cmd)
     os.system(cmd)
 
 def dl_youkulixian(url):
@@ -59,50 +77,6 @@ def dl_youkulixian(url):
     os.chdir(config.out_dir)
     cmd += r' "%s"' % url
     os.system(cmd)
-
-def search_m3u(search_path):
-    m3us = []
-    for m3u in os.listdir(search_path):
-        if m3u.endswith('.m3u') and os.path.isfile(m3u):
-            m3us.append(m3u)
-    if len(m3us) == 0:
-        os.system('say m3u file not found!!')
-        return
-    elif len(m3us) == 1:
-        m3ufile = m3us[0]
-    else:
-        i = 1
-        for m3u in m3us:
-            print "[%d] %s" % (i, m3u)
-            i += 1
-        pos = int(raw_input())
-        m3ufile = m3us[pos-1]
-    return pjoin(search_path, m3ufile)
-
-def dl_m3u(m3ufile):
-    import time
-    out_dir = config.out_dir
-    if not m3ufile:
-        m3ufile = search_m3u(out_dir)
-    urls = []
-    with open(m3ufile, 'r') as content:
-        lines = content.readlines()
-    for url in lines:
-        url = url.strip()
-        if not url.startswith('#'):
-            urls.append(url)
-    if not urls[0].startswith("http:"):
-        title = urls[0]
-        urls = urls[1:]
-    else:
-        title = "%s-%s"%(time.strftime("%Y%m%d%H%M%S", time.localtime()), m3ufile)
-    output_dir = pjoin(out_dir, title)
-    if output_dir.endswith('.m3u'):
-        output_dir = output_dir[:-4]
-    if not os.path.isdir(output_dir):
-        print output_dir
-        os.mkdir(output_dir)
-    dl_urls(urls, title)
 
 def dl_flvcd(url):
     import urllib
@@ -138,10 +112,7 @@ def dl_urls(urls, title, refer=None):
                   nthread=10, nperfile=True, refer=refer, merge=True)
     return result
 
-def dl_dispatch(url, is_m3u=False):
-    if is_m3u:
-        dl_m3u(url)
-        return
+def dl_dispatch(url):
     if url.find("youtube.com") >= 0:
         dl_u2b(url, sys.argv[2:])
     elif config.flvcd['default']:
@@ -154,27 +125,6 @@ def dl_dispatch(url, is_m3u=False):
         else:
             dl_youkulixian(url)
 
-def parse_args(config_file=None):
-    usage = """./dlvideo [-m][-c config][-o output][-f format] url1 url2 ..."""
-    if config_file:
-        config = Config(config_file)
-    else:
-        config = Config('config.ini')
-    import argparse
-    parser=argparse.ArgumentParser(usage=usage, description='download net video', version='0.1')
-    parser.add_argument('urls', nargs='+', help='urls')
-    parser.add_argument('-c', '--config', default='config.ini')
-    parser.add_argument('-m', '--m3u8', action='store_true', default=False)
-    parser.add_argument('-o', '--odir')
-    parser.add_argument('--list-page', dest='list_page', action='store_true')
-    parser.add_argument('--list-file', dest='list_file', action='store_true')
-    parser.add_argument('-f', '--format', help='video format:super, normal',choices=['super', 'normal'])
-    args = parser.parse_args()
-    if not config_file and abspath(args.config) != abspath('config.ini'):
-        return parse_args(args.config)
-    print 'args===>{}'.format(args)
-    return args, config
-
 def read_list_file(file_name):
     urls = []
     with open(file_name, 'r') as ofp:
@@ -184,9 +134,34 @@ def read_list_file(file_name):
                 urls.append(line)
     return urls
 
+def parse_args(config_file=None):
+    import argparse
+    usage = """./dlvideo [-m][-c config][-o output][-f format] url1 url2 ..."""
+    parser=argparse.ArgumentParser(usage=usage, description='download net video', version='0.1')
+    parser.add_argument('urls', nargs='+', help='urls')
+    parser.add_argument('-c', '--config', default='config.ini')
+    parser.add_argument('-o', '--odir')
+    parser.add_argument('--list-page', dest='list_page', action='store_true')
+    parser.add_argument('--list-file', dest='list_file', action='store_true')
+    parser.add_argument('-f', '--format', help='video format:super, normal',choices=['super', 'normal'])
+    args = parser.parse_args()
+    print args
+    return args
+
+def init_args_config():
+    config = Config()
+    args = parse_args()
+    if args.config != 'config.ini':
+        config = Config(config=args.config)
+        args = parse_args()
+    log = util.get_logger(logfile=config.log, level=config.log_level)
+    return args, config, log
+
 def main():
+    global log
     global config
-    args, config = parse_args()
+    args, config, log = init_args_config()
+    log.info('{}'.format(args))
     if args.odir:
         config.out_dir = args.odir
     if args.format:
@@ -195,18 +170,15 @@ def main():
         args.urls = read_list_file(args.list_file)
     if args.list_page:
         args.urls = play_list.YoukuFilter().handle(args.urls[0])
-    url_failed = []
     for url in args.urls:
         try:
-            dl_dispatch(url, args.m3u8)
+            dl_dispatch(url)
+            log.info('[DLOK] %s', url)
         except KeyboardInterrupt as e:
             raise e
         except Exception as e:
-            print 'exception happened:', e.message
-            print '[===> url=]', url
-            url_failed.append(url)
-    for url in url_failed:
-        print '[url failed] ', url
+            log.error('==> exception happened: %s', url)
+            log.exception(e)
 
 if __name__ == "__main__":
     # signal_handler = util.SignalHandlerBase()
