@@ -169,7 +169,8 @@ def main():
     if args.list_file:
         args.urls = read_list_file(args.list_file)
     if args.list_page:
-        args.urls = play_list.YoukuFilter().handle(args.urls[0])
+        odir, args.urls = play_list.YoukuFilter().handle(args.urls[0])
+        config.out_dir = pjoin(config.out_dir, odir)
     for url in args.urls:
         try:
             dl_dispatch(url)
