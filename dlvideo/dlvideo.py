@@ -141,7 +141,7 @@ def parse_args(config_file=None):
     parser.add_argument('urls', nargs='+', help='urls')
     parser.add_argument('-c', '--config', default='config.ini')
     parser.add_argument('-o', '--odir')
-    parser.add_argument('--list-page', dest='list_page', action='store_true')
+    parser.add_argument('--list-page', '-l', dest='list_page', action='store_true')
     parser.add_argument('--list-file', dest='list_file', action='store_true')
     parser.add_argument('-f', '--format', help='video format:super, normal',choices=['super', 'normal'])
     args = parser.parse_args()
@@ -174,7 +174,7 @@ def main():
     for url in args.urls:
         try:
             dl_dispatch(url)
-            log.info('[DLOK] %s', url)
+            log.info('[__DLOK__] %s', url)
         except KeyboardInterrupt as e:
             raise e
         except Exception as e:
