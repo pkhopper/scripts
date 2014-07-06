@@ -23,14 +23,14 @@ class Config:
         if config_file:
             config_file = pabspath(config_file)
         else:
-            config_file = pjoin(script_dir, config)
+            config_file = pjoin(script_dir, "config.ini")
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
         cfg.read(config_file)
         self.out_dir = cfg.get('default', 'out_dir')
         self.channel = cfg.get('default', 'channel')
         self.duration = cfg.getint('default', 'duration')
-        self.log_file = cfg.get('default', 'log_file')
+        self.log = cfg.get('default', 'log')
         self.log_level = cfg.get('default', 'log_level')
         self.live_url = cfg.get('default', 'live_url')
         self.pythonpath = cfg.get('environment', 'pythonpath')
@@ -50,7 +50,7 @@ class Config:
         }
         if self.log_level:
             self.log_level = lvlconvert[self.log_level.strip().lower()]
-config = None
+config = Config()
 log = None
 
 sys.path.insert(0, config.pythonpath)
@@ -79,6 +79,22 @@ def filter_host(url):
         return re.match('(^http[s]?://[^/?]*/)', url).group(0)
     else:
         return re.match('(^http[s]?://.*/)', url).group(0)
+
+import threading
+class DownloadThread:
+    def __init__(self, url, filename, duration=0, n_perfile=10, refer=None):
+        self.url = url
+        self.filename = filename
+        self.duration = duration
+        self.thread = threading.Thread(target=self._run)
+        self.join = self.thread.join
+        self.thread.start()
+    def _run(self,*_args, **_kwargs):
+        with open(self.filename, 'w') as fp:
+            download_handle = DownloadStreamHandler(fp, self.duration)
+            HttpUtil().fetch(self.url, download_handle)
+        log.debug('--> file download ok: %s', self.filename)
+
 
 class M3u8:
     def __init__(self, http):
@@ -109,6 +125,11 @@ class M3u8:
 
     def get_curr_stream(self, url, url_base, duration, ofp):
         urls, targetduration = self.get_curr_index(url, url_base)
+        # count = self.__dl_single(urls, ofp=ofp, duration=duration)
+        count = self.__dl_multiple(urls, ofp=ofp, duration=duration)
+        return count, len(urls), targetduration
+
+    def __dl_single(self, urls, ofp, duration):
         count = 0
         for url in urls:
             if not self.old_ts_filter.has_key(url):
@@ -117,7 +138,33 @@ class M3u8:
                 self.http.fetch(url, download_handle)
                 self.old_ts_filter[url] = ''
                 count += 1
-        return count, len(urls), targetduration
+        return count
+
+    def __dl_multiple(self, urls, ofp, duration):
+        name_index = 0
+        count = 0
+        tmp_files = []
+        threads = []
+        util.assure_path(pjoin(config.out_dir, '.dllive'))
+        for url in urls:
+            if not self.old_ts_filter.has_key(url):
+                log.debug('Download m3u8 ts: %s', url)
+                name_index += 1
+                tmp_file = '{}.{}.tmp'.format(name_index, hash(url))
+                tmp_file = pjoin(config.out_dir, '.dllive', tmp_file)
+                tmp_files.append(tmp_file)
+                threads.append(DownloadThread(url, filename=tmp_file, duration=duration))
+                self.old_ts_filter[url] = ''
+                count += 1
+        i = 0
+        for i, th in enumerate(threads):
+            th.join()
+            if not th.thread.isAlive():
+                log.debug('==> write file: %s', tmp_files[i])
+                with open(tmp_files[i], 'r') as fp:
+                    ofp.write(fp.read())
+                os.remove(tmp_files[i])
+        return count
 
     def dl_stream(self, url, url_base, duration, ofp):
         start_time = time.time()
