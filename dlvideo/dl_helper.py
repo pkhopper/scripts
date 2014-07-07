@@ -3,7 +3,6 @@
 
 import os
 import sys
-import shutil
 from vavava import util
 util.set_default_utf8()
 
@@ -33,12 +32,12 @@ def escape_file_path(path):
     path = path.replace('\'', '_')
     return path
 
-def dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
-    if os.path.isfile(vfile):
-        log.info("[Already done, abort] %s", vfile)
+def dl_methods(url, file_name, refer=None, nthread=10, nperfile=True):
+    if os.path.isfile(file_name):
+        log.info("download file exists, abort.: %s", file_name)
         return
     # 3 methods to download url
-    tmp_file = vfile + '!'
+    tmp_file = file_name + '!'
     result = 0
     if not nperfile:
         # 1:
@@ -50,26 +49,24 @@ def dl_methods(url, vfile, refer=None, nthread=10, nperfile=True):
     # print 'Downloading %s ...' % filename
     # url_save(url, tmp_file, bar, refer=refer)
     # bar.done()
-    os.rename(tmp_file, vfile)
+    os.rename(tmp_file, file_name)
     return result
 
 
 def download_urls(urls, title, ext, odir='.', nthread=10,
                   nperfile=True, refer=None, merge=True):
-    assert urls
-    assert ext in ('flv', 'mp4')
     title = to_native_string(title)
     origin_title = title
     title = escape_file_path(title)
     origin_title = '%s.%s' % (origin_title, ext)
     filename = '%s.%s' % (title, ext)
     origin_title = pjoin(odir, origin_title)
-    vfile = pjoin(odir, filename)
-    if os.path.exists(origin_title) or os.path.exists(vfile):
+    file_name = pjoin(odir, filename)
+    if os.path.exists(origin_title) or os.path.exists(file_name):
         log.info('out put file exists, %s', origin_title)
         return
     files = []
-    print 'Downloading %s.%s ...' % (title, ext)
+    # print 'Downloading %s.%s ...' % (title, ext)
     tmp_path = pjoin(odir, '.dlvideo')
     util.assure_path(tmp_path)
     if len(urls) > 1:
@@ -89,31 +86,13 @@ def download_urls(urls, title, ext, odir='.', nthread=10,
             else:
                 log.error("Can't join files: {}".format(files))
                 return
-            concat(files, vfile)
+            concat(files, file_name)
             for f in files:
                 os.remove(f)
     else:
-        dl_methods(urls[0], vfile=vfile, refer=refer, nthread=10, nperfile=True)
+        dl_methods(urls[0], file_name=file_name, refer=refer, nthread=10, nperfile=True)
         print 'ok'
-    os.rename(vfile, origin_title)
-
-def playlist_not_supported(name):
-    def f(*args, **kwargs):
-        raise NotImplementedError('Play list is not supported for '+name)
-    return f
-
-# class DownloadThread:
-#     def __init__(self, url, file_path, n_perfile=10, refer=None):
-#         self.url = url
-#         self.file_path = file_path
-#         self.n_perfile = n_perfile
-#         self.refer = refer
-#         self.thread = threading.Thread(target=self._run)
-#         self.join = self.thread.join
-#         self.thread.start()
-#     def _run(self,*_args, **_kwargs):
-#         dl_methods(url=self.url, out=self.file_path,
-#                     n_perfile=self.n_perfile, refer=self.refer)
+    os.rename(file_name, origin_title)
 
 class Wget:
     def __init__(self):
@@ -126,13 +105,10 @@ class Wget:
             cmd += " --referer='%s'"%(referer)
         if out:
             cmd += " --output-document='%s'"%(out)
-        if proxy:
-            pass
-        else:
+        if not proxy:
             cmd += " --no-proxy"
         cmd += " '%s'"%(url)
         print cmd
-        import os
         return os.system(cmd)
 
 
@@ -152,21 +128,6 @@ class Axel:
             cmd += " -o '%s'"%(out)
         cmd += " '%s'"%(url)
         print cmd
-        import os
-        return os.system(cmd)
-
-    def gets(self, urls, out=None, n=None, referer=None):
-        cmd = "axel -v -a -U '%s'"%(self.useragent)
-        if referer:
-            cmd += " -H 'Referer:%s'"%(referer)
-        if n:
-            cmd += " -n %d"%(n)
-        if out:
-            cmd += " -o '%s'"%(out)
-        for url in urls:
-            cmd += " '%s'"%(url)
-        print cmd
-        import os
         return os.system(cmd)
 
 if __name__ == '__main__':

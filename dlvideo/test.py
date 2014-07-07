@@ -6,18 +6,28 @@ import unittest
 import dlvideo
 import dl_helper
 
-argparse_cases = [
-    ['url1', 'url2', 'url3', 'url4'],
-    ['url1', 'url2', 'url3', 'url4'],
-    ['url1', 'url2', 'url3', 'url4', '-f', 'super', '-c', 'config_test.ini'],
-]
-class TestDlvideoCase(unittest.TestCase):
-    def testArgparse(self):
-        for args in argparse_cases:
-            sys.argv = ['cmd'] + args
-            result = dlvideo.parse_args()
-            print result
-            self.assertEqual(result.urls, args[:4])
+class TestParsers(unittest.TestCase):
+    def test_urls(self):
+        import parsers
+        urls = [
+            'http://tv.sohu.com/20120726/n349115692.shtml',
+            # 'http://v.youku.com/v_show/id_XNzM3MTQwMDY4.html?f=22506977&ev=1',
+            'http://www.56.com/u52/v_MTE4NjA0MDY1.html',
+            'http://www.tudou.com/programs/view/ZAoQTPEqjAo/',
+            # 'http://www.iqiyi.com/v_19rrhkqzgo.html'
+        ]
+        for url in urls:
+           print parsers.getVidPageParser(url).info(url)
+
+    def test_playlist(self):
+        import parsers
+        urls = [
+            # 'http://tv.sohu.com/20120726/n349115692.shtml',
+            # 'http://v.youku.com/v_show/id_XNDIwNjkzMzky.html',
+            'http://v.youku.com/v_show/id_XNzIyOTE1NTUy.html?f=22331872',
+        ]
+        for url in urls:
+           print parsers.getPlayListParser(url).info(url)
 
 class TestDl_helper(unittest.TestCase):
     def test_dlhelper(self):
@@ -27,8 +37,8 @@ class TestDl_helper(unittest.TestCase):
 
 def suite():
     suite = unittest.TestSuite()
-    # suite.addTest(TestDlvideoCase("testSize"))
     suite.addTest(TestDl_helper())
+    suite.addTest(TestParsers())
     return suite
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
 import os
 import sys
 from vavava import util
-import play_list
+import parsers
 util.set_default_utf8()
 
 pjoin = os.path.join
@@ -27,7 +27,7 @@ class Config:
         cfg = ConfigParser.ConfigParser()
         cfg.read(config_file)
         self.out_dir = cfg.get('default', 'out_dir')
-        self.format = cfg.get('default', 'format')
+        self.format = cfg.getint('default', 'format')
         self.log = cfg.get('default', 'log')
         self.log_level = cfg.get('default', 'log_level')
         self.lib_dir = cfg.get('script', 'lib_dir')
@@ -85,8 +85,9 @@ def dl_flvcd(url):
     parse_url = 'http://www.flvcd.com/parse.php?'
     parse_url += 'kw='+ urllib.quote(url)
     parse_url += '&flag=one'
-    if config.format == 'super':
-        parse_url += '&format=super'
+    format = ['', 'high', 'super', 'real']
+    if config.format > 0:
+        parse_url += '&format=%s'%format[config.format]
     http = HttpUtil()
     http.add_header('Referer', parse_url)
     html = http.get(parse_url).decode('gb2312')
@@ -100,14 +101,15 @@ def dl_flvcd(url):
     title = title.strip()
     dl_urls(urls=[url for url in m3u.split('|')], title=title, refer=url)
 
-def dl_urls(urls, title, refer=None):
+def dl_urls(urls, title, ext=None, refer=None):
     urllist = []
     for url in urls:
         if url.startswith('http'):
             urllist.append(url)
-    ext = 'flv'
-    if urllist[0].find('mp4') > 0:
-        ext = 'mp4'
+    if not ext:
+        ext = 'flv'
+        if urllist[0].find('mp4') > 0:
+            ext = 'mp4'
     result = download_urls(urllist, title, ext, odir=config.out_dir,
                   nthread=10, nperfile=True, refer=refer, merge=True)
     return result
@@ -123,27 +125,20 @@ def dl_dispatch(url):
         if site not in config.flvcd or config.flvcd[site]:
             dl_flvcd(url)
         else:
-            dl_youkulixian(url)
+            urls, title, ext = parsers.getVidPageParser(url).info(url, vidfmt=config.format)
+            dl_urls(urls=urls, title=title, ext=ext, refer=url)
+        # else:
+        #     dl_youkulixian(url)
 
-def read_list_file(file_name):
-    urls = []
-    with open(file_name, 'r') as ofp:
-        lines = ofp.readlines()
-        for line in lines:
-            if not line.strip().startswith('#'):
-                urls.append(line)
-    return urls
-
-def parse_args(config_file=None):
+def parse_args(cfg=None):
     import argparse
-    usage = """./dlvideo [-m][-c config][-o output][-f format] url1 url2 ..."""
+    usage = """./dlvideo [-m][-l][-c config][-o output][-f format] url ..."""
     parser=argparse.ArgumentParser(usage=usage, description='download net video', version='0.1')
     parser.add_argument('urls', nargs='+', help='urls')
     parser.add_argument('-c', '--config', default='config.ini')
     parser.add_argument('-o', '--odir')
-    parser.add_argument('--list-page', '-l', dest='list_page', action='store_true')
-    parser.add_argument('--list-file', dest='list_file', action='store_true')
-    parser.add_argument('-f', '--format', help='video format:super, normal',choices=['super', 'normal'])
+    parser.add_argument('--play-list', '-l', dest='play_list', action='store_true')
+    parser.add_argument('-f', '--format', help='video format:super, normal',choices=['0', '1', '2', '3'])
     args = parser.parse_args()
     print args
     return args
@@ -165,12 +160,12 @@ def main():
     if args.odir:
         config.out_dir = args.odir
     if args.format:
-        config.format = args.format
-    if args.list_file:
-        args.urls = read_list_file(args.list_file)
-    if args.list_page:
-        odir, args.urls = play_list.YoukuFilter().handle(args.urls[0])
+        config.format = int(args.format)
+    if args.play_list:
+        url = args.urls[0]
+        odir, args.urls = parsers.getPlayListParser(url).info(url)
         config.out_dir = pjoin(config.out_dir, odir)
+        util.assure_path(config.out_dir)
     for url in args.urls:
         try:
             dl_dispatch(url)
