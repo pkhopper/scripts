@@ -7,8 +7,16 @@ import time
 import urllib
 import urllib2
 import re
+import threading
 from time import sleep
 
+from vavava.httputil import HttpUtil
+from vavava.httputil import MiniAxel
+from vavava.httputil import DownloadStreamHandler
+from vavava import util
+
+util.set_default_utf8()
+CHARSET = "utf-8"
 pjoin = os.path.join
 pdirname = os.path.dirname
 pabspath = os.path.abspath
@@ -50,15 +58,8 @@ class Config:
         }
         if self.log_level:
             self.log_level = lvlconvert[self.log_level.strip().lower()]
-config = Config()
+config = None
 log = None
-
-sys.path.insert(0, config.pythonpath)
-from vavava.httputil import HttpUtil, MiniAxel
-from vavava.httputil import DownloadStreamHandler
-from vavava import util
-util.set_default_utf8()
-CHARSET = "utf-8"
 
 def get_channel_url(name, addr_file):
     urls = []
@@ -80,29 +81,11 @@ def filter_host(url):
     else:
         return re.match('(^http[s]?://.*/)', url).group(0)
 
-import threading
-class DownloadThread:
-    def __init__(self, url, filename, duration=0, n_perfile=10, refer=None):
-        self.url = url
-        self.filename = filename
-        self.duration = duration
-        self.thread = threading.Thread(target=self._run)
-        self.join = self.thread.join
-        self.thread.start()
-    def _run(self,*_args, **_kwargs):
-        with open(self.filename, 'w') as fp:
-            # # 1.
-            # download_handle = DownloadStreamHandler(fp, self.duration)
-            # HttpUtil().fetch(self.url, download_handle)
-            # 2.
-            MiniAxel().dl(self.url, fp=fp, n=3)
-        log.debug('--> file download ok: %s', self.filename)
-
-
 class M3u8:
     def __init__(self, http):
         self.http = http
-        self.old_ts_filter = dict()
+        self.old_urls = dict()
+        self.threads = None
 
     def get_curr_index(self, url, url_base=None):
         lines = []
@@ -115,7 +98,7 @@ class M3u8:
             if url.strip() == '':
                 continue
             elif not url.startswith('#'):
-                log.debug('[m3u8_iner_url] %s', url)
+                log.debug('m3u8InerUrl ==> %s', url)
                 if not url.startswith('http'):
                     url = urllib.basejoin(url_base, url)
                 if url.endswith('.m3u8'):
@@ -135,38 +118,39 @@ class M3u8:
     def __dl_single(self, urls, ofp, duration):
         count = 0
         for url in urls:
-            if not self.old_ts_filter.has_key(url):
+            if not self.old_urls.has_key(url):
                 log.debug('Download m3u8 ts: %s', url)
                 download_handle = DownloadStreamHandler(ofp, duration)
                 self.http.fetch(url, download_handle)
-                self.old_ts_filter[url] = ''
+                self.old_urls[url] = ''
                 count += 1
         return count
 
     def __dl_multiple(self, urls, ofp, duration):
+        self.threads = []
         name_index = 0
         count = 0
         tmp_files = []
-        threads = []
         util.assure_path(pjoin(config.out_dir, '.dllive'))
         for url in urls:
-            if not self.old_ts_filter.has_key(url):
+            if not self.old_urls.has_key(url):
                 log.debug('Download m3u8 ts: %s', url)
                 name_index += 1
                 tmp_file = '{}.{}.tmp'.format(name_index, hash(url))
                 tmp_file = pjoin(config.out_dir, '.dllive', tmp_file)
-                tmp_files.append(tmp_file)
-                threads.append(DownloadThread(url, filename=tmp_file, duration=duration))
-                self.old_ts_filter[url] = ''
+                tmp_files.append((tmp_file, url))
+                self.threads.append(M3u8.DownloadThread(url, filename=tmp_file, duration=duration))
                 count += 1
-        i = 0
-        for i, th in enumerate(threads):
+        for i, th in enumerate(self.threads):
             th.join()
-            if not th.thread.isAlive():
-                log.debug('==> write file: %s', tmp_files[i])
-                with open(tmp_files[i], 'r') as fp:
-                    ofp.write(fp.read())
-                os.remove(tmp_files[i])
+            if not th.finish:
+                log.error('thread exit with unfinished work.[%d]'%i)
+                break
+            log.debug('==> write file: %s', tmp_files[i][0])
+            with open(tmp_files[i][0], 'r') as fp:
+                ofp.write(fp.read())
+            os.remove(tmp_files[i][0])
+            self.old_urls[tmp_files[i][1]] = ''
         return count
 
     def dl_stream(self, url, url_base, duration, ofp):
@@ -177,20 +161,43 @@ class M3u8:
             before = time.time()
             count, total, targetduration = self.get_curr_stream(url, url_base, duration, ofp)
             after = time.time()
-            time_transfer = after - before
-            server_duration = (total - count)*targetduration
-            time_buffered = server_duration - time_transfer
-            total_server += targetduration*count
+            curr_local = after - before   # time_transfer
+            curr_server = count * targetduration
+            curr_buffered = curr_server - curr_local
+            total_server += curr_server
             total_local = after - start_time
-            # T=total;C=current;SD=server target duration;
-            log.debug('T:%.2f/%.2f(%.2f);C:%.2f/%.2f(%.2f);B=%.2f;SD=%.2f',
-                      total_local, total_server, total_server - total_local, time_transfer,
-                      server_duration, server_duration - time_transfer, time_buffered, targetduration)
-            if duration > 0 and stop_time - after < max(time_buffered, 0.01):
+            total_buffered = total_server - total_local
+            # T=total;C=current;
+            log.debug('T:%.2f/%.2f(%.2f);C:%.2f/%.2f(%.2f);',
+                      total_local, total_server, total_buffered,
+                      curr_local, curr_server, curr_buffered)
+            if duration > 0 and stop_time - after < max(curr_buffered, 0.01):
                 log.debug(r"===> time's up.")
                 break
-            if time_buffered > 5:
-                sleep(10)
+            if curr_buffered > targetduration and total_buffered > targetduration:
+                wait = min(10, targetduration)
+                log.debug('sleep(%d)', wait)
+                sleep(wait)
+
+    class DownloadThread:
+        def __init__(self, url, filename, duration=0):
+            self.url = url
+            self.filename = filename
+            self.duration = duration
+            self.thread = threading.Thread(target=self._run)
+            self.finish = False
+            self.join = self.thread.join
+            self.thread.start()
+        def _run(self,*_args, **_kwargs):
+            with open(self.filename, 'w') as fp:
+                # # 1.
+                # download_handle = DownloadStreamHandler(fp, self.duration)
+                # HttpUtil().fetch(self.url, download_handle)
+                # 2.
+                MiniAxel().dl(self.url, fp=fp, n=3)
+                self.finish = True
+            log.debug('--> file download ok: %s', self.filename)
+
 
 class DownloadLiveStream:
 
