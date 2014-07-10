@@ -175,8 +175,6 @@ class M3u8:
             if duration > 0 and stop_time - after < max(curr_buffered, 0.01):
                 log.debug(r"===> time's up.")
                 break
-            if count == 0:
-                sleep()
             if count == 0 \
                     or (curr_buffered > targetduration and total_buffered > targetduration):
                 wait = min(10, targetduration)
