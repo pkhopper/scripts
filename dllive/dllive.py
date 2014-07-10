@@ -168,13 +168,17 @@ class M3u8:
             total_local = after - start_time
             total_buffered = total_server - total_local
             # T=total;C=current;
-            log.debug('T:%.2f/%.2f(%.2f);C:%.2f/%.2f(%.2f);',
+            log.debug('CURR:%.2f/%.2f(%.2f);TOTAL:%.2f/%.2f(%.2f);DURATION:%d;COUNT:%d',
+                      curr_local, curr_server, curr_buffered,
                       total_local, total_server, total_buffered,
-                      curr_local, curr_server, curr_buffered)
+                      targetduration, count)
             if duration > 0 and stop_time - after < max(curr_buffered, 0.01):
                 log.debug(r"===> time's up.")
                 break
-            if curr_buffered > targetduration and total_buffered > targetduration:
+            if count == 0:
+                sleep()
+            if count == 0 \
+                    or (curr_buffered > targetduration and total_buffered > targetduration):
                 wait = min(10, targetduration)
                 log.debug('sleep(%d)', wait)
                 sleep(wait)
@@ -269,7 +273,7 @@ def interact(duration, out_dir, address_file, proxy=None):
     channel_id = int(raw_input('id? ')) - 1
     DownloadLiveStream().recode(sub_addr[channel_list[channel_id]], duration, out_dir)
 
-def parse_args():
+def parse_args(config):
     usage = """./dllive [-i|l][-c config][-o out_put_path][-f favorite][-d duration]"""
     import argparse
     parser=argparse.ArgumentParser(usage=usage, description='download live stream', version='0.1')
@@ -287,10 +291,10 @@ def parse_args():
 
 def init_args_config():
     config = Config()
-    args = parse_args()
+    args = parse_args(config)
     if args.config != 'config.ini':
         config = Config(config=args.config)
-        args = parse_args()
+        args = parse_args(config)
     log = util.get_logger(logfile=config.log, level=config.log_level)
     return args, config, log
 
