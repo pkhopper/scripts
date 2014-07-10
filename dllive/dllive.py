@@ -54,7 +54,7 @@ config = Config()
 log = None
 
 sys.path.insert(0, config.pythonpath)
-from vavava.httputil import HttpUtil
+from vavava.httputil import HttpUtil, MiniAxel
 from vavava.httputil import DownloadStreamHandler
 from vavava import util
 util.set_default_utf8()
@@ -91,8 +91,11 @@ class DownloadThread:
         self.thread.start()
     def _run(self,*_args, **_kwargs):
         with open(self.filename, 'w') as fp:
-            download_handle = DownloadStreamHandler(fp, self.duration)
-            HttpUtil().fetch(self.url, download_handle)
+            # # 1.
+            # download_handle = DownloadStreamHandler(fp, self.duration)
+            # HttpUtil().fetch(self.url, download_handle)
+            # 2.
+            MiniAxel().dl(self.url, fp=fp, n=3)
         log.debug('--> file download ok: %s', self.filename)
 
 
