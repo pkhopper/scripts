@@ -130,7 +130,7 @@ def dl_dispatch(url):
         # else:
         #     dl_youkulixian(url)
 
-def parse_args(cfg=None):
+def parse_args(config):
     import argparse
     usage = """./dlvideo [-m][-l][-c config][-o output][-f format] url ..."""
     parser=argparse.ArgumentParser(usage=usage, description='download net video', version='0.1')
@@ -145,10 +145,10 @@ def parse_args(cfg=None):
 
 def init_args_config():
     config = Config()
-    args = parse_args()
+    args = parse_args(config=config)
     if args.config != 'config.ini':
         config = Config(config=args.config)
-        args = parse_args()
+        args = parse_args(config=config)
     log = util.get_logger(logfile=config.log, level=config.log_level)
     return args, config, log
 

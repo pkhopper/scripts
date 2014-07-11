@@ -22,8 +22,8 @@ class TestParsers(unittest.TestCase):
     def test_playlist(self):
         import parsers
         urls = [
-            # 'http://tv.sohu.com/20120726/n349115692.shtml',
-            # 'http://v.youku.com/v_show/id_XNDIwNjkzMzky.html',
+            'http://tv.sohu.com/20120726/n349115692.shtml',
+            'http://v.youku.com/v_show/id_XNDIwNjkzMzky.html',
             'http://v.youku.com/v_show/id_XNzIyOTE1NTUy.html?f=22331872',
         ]
         for url in urls:

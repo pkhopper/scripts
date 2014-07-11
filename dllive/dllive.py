@@ -312,8 +312,7 @@ def main():
     elif args.channellist:
         script_path = util.get_file_path(__file__)
         os.system('python %s/xbmc_5ivdo.py -t 直播 > %s'%(
-            script_path, config.address_file)
-        )
+            script_path, config.address_file))
         return
     elif args.favorite:
         for favorite in config.favorites:
