@@ -10,7 +10,7 @@ def tudou_download_by_iid(iid, title, refer, merge=True):
     xml = unescape_html(xml)
     url = r1(r'<f[^>]*>([^<]*)<', xml)
     # download_urls([url], title, 'flv', total_size=None, merge=merge)
-    return [url], title, 'flv'
+    return [url], title, 'flv', 5, None
 
 # def tudou_download_by_id(id, title, merge=True):
 #     html = get_html('http://www.tudou.com/programs/view/%s/' % id)

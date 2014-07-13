@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from re import search
 from base_types import *
 from util import *
 from vavava.httputil import HttpUtil
@@ -21,12 +22,18 @@ def w56_download_by_id(id, refer, vidfmt=0, merge=True):
     url = files[0]['url']
     ext = r1(r'\.([^.]+)\?', url)
     assert ext in ('flv', 'mp4')
-    return [url], title, str(ext)
+    return [url], title, str(ext), 1, None
 
-def w56_download(url, vidfmt, merge=True):
-    id = r1(r'http://www.56.com/u\d+/v_(\w+).html', url)
-    return w56_download_by_id(id, url, vidfmt=vidfmt, merge=merge)
+def w56_download(url, vidfmt):
+    # id = r1(r'http://www.56.com/u\d+/v_(\w+).html', url)
+    id = r1(r'(\w+).html', url)
+    return w56_download_by_id(id, url, vidfmt=vidfmt)
 
 class W56(VidParserBase):
     def info(self, url, vidfmt=0):
         return w56_download(url, vidfmt=vidfmt)
+
+if __name__ == '__main__':
+    url = r'http://www.56.com/u92/v_NDgzNzQ3Mzc.html'
+    url = r'http://www.56.com/w99/play_album-aid-9904987_vid-NjgxODA5NTI.html'
+    print W56().info(url)

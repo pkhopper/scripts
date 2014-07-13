@@ -4,8 +4,9 @@
 import os
 import sys
 from vavava import util
-import parsers
+import dl_helper
 util.set_default_utf8()
+import parsers
 
 pjoin = os.path.join
 pdirname = os.path.dirname
@@ -14,10 +15,7 @@ user_path = os.environ['HOME']
 
 class Config:
     def __init__(self, config=None):
-        if os.path.islink(__file__):
-            script_dir = pdirname(pabspath(os.readlink(__file__)))
-        else:
-            script_dir = pdirname(pabspath(__file__))
+        script_dir = util.get_file_path(__file__)
         config_file = config
         if config_file:
             config_file = pabspath(config_file)
@@ -28,6 +26,8 @@ class Config:
         cfg.read(config_file)
         self.out_dir = cfg.get('default', 'out_dir')
         self.format = cfg.getint('default', 'format')
+        self.nthread = cfg.getint('network', 'nthread')
+        self.nperfile = cfg.getint('network', 'nperfile')
         self.log = cfg.get('default', 'log')
         self.log_level = cfg.get('default', 'log_level')
         self.lib_dir = cfg.get('script', 'lib_dir')
@@ -55,12 +55,6 @@ class Config:
 config = None
 log = None
 
-# sys.path.insert(0, config.lib_dir)
-# common = __import__('common')
-# download_urls = common.download_urls
-import dl_helper
-download_urls = dl_helper.download_urls
-
 def dl_u2b(url, argv):
     cmd = config.u2b_cmd
     cmd += r' --proxy "%s"' % config.u2b_proxy
@@ -72,18 +66,12 @@ def dl_u2b(url, argv):
     log.debug('==> %s', cmd)
     os.system(cmd)
 
-def dl_youkulixian(url):
-    cmd = config.cmd
-    os.chdir(config.out_dir)
-    cmd += r' "%s"' % url
-    os.system(cmd)
-
 def dl_flvcd(url):
-    import urllib
+    from urllib import quote
     from re import findall
     from vavava.httputil import HttpUtil
     parse_url = 'http://www.flvcd.com/parse.php?'
-    parse_url += 'kw='+ urllib.quote(url)
+    parse_url += 'kw='+ quote(url)
     parse_url += '&flag=one'
     format = ['', 'high', 'super', 'real']
     if config.format > 0:
@@ -99,22 +87,14 @@ def dl_flvcd(url):
         os.system('say "not support."')
         return
     title = title.strip()
-    dl_urls(urls=[url for url in m3u.split('|')], title=title, refer=url)
-
-def dl_urls(urls, title, ext=None, refer=None):
-    urllist = []
-    for url in urls:
-        if url.startswith('http'):
-            urllist.append(url)
-    if not ext:
-        ext = 'flv'
-        if urllist[0].find('mp4') > 0:
-            ext = 'mp4'
-    result = download_urls(urllist, title, ext, odir=config.out_dir,
-                  nthread=10, nperfile=True, refer=refer, merge=True)
-    return result
+    downloader = dl_helper.Downloader(
+        nperfile=config.nperfile, nthread=config.nthread, log=log)
+    urls = [url for url in m3u.split('|')]
+    downloader.download(urls, title=title, out_dir=config.out_dir)
+    return title
 
 def dl_dispatch(url):
+    local_file = None
     if url.find("youtube.com") >= 0:
         dl_u2b(url, sys.argv[2:])
     elif config.flvcd['default']:
@@ -123,12 +103,17 @@ def dl_dispatch(url):
             lambda x: re.findall(r'(?P<as>[^\\/\.]*\.[^\\/\.]*)[\\|/]', x.lower())[0]
         site = available_4flvcd(url)
         if site not in config.flvcd or config.flvcd[site]:
-            dl_flvcd(url)
+            local_file = dl_flvcd(url)
         else:
-            urls, title, ext = parsers.getVidPageParser(url).info(url, vidfmt=config.format)
-            dl_urls(urls=urls, title=title, ext=ext, refer=url)
-        # else:
-        #     dl_youkulixian(url)
+            urls, title, ext, nperfile, referer = \
+                parsers.getVidPageParser(url).info(url, vidfmt=config.format)
+            downloader = dl_helper.Downloader(
+                nperfile=config.nperfile, nthread=config.nthread, log=log)
+            if nperfile == 1:
+                downloader.nperfile = 1
+            downloader.download(
+                urls, title=title, out_dir=config.out_dir, ext=ext, referer=referer)
+        log.info(r"[O.F.] %s" % local_file)
 
 def parse_args(config):
     import argparse
@@ -140,7 +125,7 @@ def parse_args(config):
     parser.add_argument('--play-list', '-l', dest='play_list', action='store_true')
     parser.add_argument('-f', '--format', help='video format:super, normal',choices=['0', '1', '2', '3'])
     args = parser.parse_args()
-    print args
+    # print args
     return args
 
 def init_args_config():
@@ -156,16 +141,17 @@ def main():
     global log
     global config
     args, config, log = init_args_config()
-    log.info('{}'.format(args))
+    dl_helper.log = log
+    # log.info('{}'.format(args))
     if args.odir:
         config.out_dir = args.odir
     if args.format:
         config.format = int(args.format)
     if args.play_list:
         url = args.urls[0]
-        odir, args.urls = parsers.getPlayListParser(url).info(url)
-        config.out_dir = pjoin(config.out_dir, odir)
-        util.assure_path(config.out_dir)
+        out_dir, args.urls = parsers.getPlayListParser(url).info(url)
+        config.out_dir = pjoin(config.out_dir, out_dir)
+        # util.assure_path(config.out_dir)
     for url in args.urls:
         try:
             dl_dispatch(url)
