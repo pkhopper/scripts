@@ -77,10 +77,14 @@ class Downloader:
                     self.dl_methods(url, tmp_file, referer=referer)
         except Exception as e:
             raise e
-        self.merge(tmp_files, file_name, ext)
+        if len(tmp_files) == 1:
+            os.rename(tmp_files[0], file_name)
+        else:
+            self.merge(tmp_files, file_name, ext)
         os.remove(cfg_file)
         for tmp_file in tmp_files:
-            os.remove(tmp_file)
+            if exists(tmp_file):
+                os.remove(tmp_file)
         os.removedirs(tmp_dir)
         self.log.debug('[dl_sequence_end] ===> %s', file_name)
 

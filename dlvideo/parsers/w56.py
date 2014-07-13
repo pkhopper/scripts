@@ -26,7 +26,7 @@ def w56_download_by_id(id, refer, vidfmt=0, merge=True):
 
 def w56_download(url, vidfmt):
     # id = r1(r'http://www.56.com/u\d+/v_(\w+).html', url)
-    id = r1(r'(\w+).html', url)
+    id = r1(r'[-|_]+(\w+).html', url)
     return w56_download_by_id(id, url, vidfmt=vidfmt)
 
 class W56(VidParserBase):
