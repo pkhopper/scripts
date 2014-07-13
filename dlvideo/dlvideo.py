@@ -113,7 +113,7 @@ def dl_dispatch(url):
                 downloader.nperfile = 1
             downloader.download(
                 urls, title=title, out_dir=config.out_dir, ext=ext, referer=referer)
-        log.info(r"[O.F.] %s" % local_file)
+        # log.info(r"[O.F.] %s" % local_file)
 
 def parse_args(config):
     import argparse
@@ -142,7 +142,7 @@ def main():
     global config
     args, config, log = init_args_config()
     dl_helper.log = log
-    # log.info('{}'.format(args))
+    log.info('{}'.format(args))
     if args.odir:
         config.out_dir = args.odir
     if args.format:
@@ -154,8 +154,9 @@ def main():
         # util.assure_path(config.out_dir)
     for url in args.urls:
         try:
+            log.info('[START] %s', url)
             dl_dispatch(url)
-            log.info('[__DLOK__] %s', url)
+            log.info('[END] %s', url)
         except KeyboardInterrupt as e:
             raise e
         except Exception as e:
@@ -173,7 +174,5 @@ if __name__ == "__main__":
     except Exception as e:
         os.system(r'say "download failed!!"')
         raise
-    finally:
-        pass
 
 

@@ -56,24 +56,25 @@ class Downloader:
             return
         if exists(tmp_dir):
             self.log.info('tmp file exists, try resume.')
-            with open(cfg_file, 'r') as fp:
-                recode_urls = fp.readlines()
-                for i, url in enumerate(recode_urls):
-                    url = url.replace('\n', '')
-                    if url.find(urls[i]) == 0:
-                        self.log.error('urls not mach:\n%s\n%s', url, urls[i])
-                        return
+            # with open(cfg_file, 'r') as fp:
+            #     recode_urls = fp.readlines()
+            #     for i, url in enumerate(recode_urls):
+            #         url = url.replace('\n', '')
+            #         if url.find(urls[i]) == 0:
+            #             self.log.error('urls not mach:\n%s\n%s', url, urls[i])
+            #             return
         else:
             util.assure_path(tmp_dir)
             with open(cfg_file, 'w') as fp:
                 fp.writelines(urls)
         tmp_files = []
-        self.log.debug('[dl_start] ===> %s', file_name)
+        self.log.debug('[dl_sequence_start] ===> %s', file_name)
         try:
             for i, url in enumerate(urls):
-                tmp_file = pjoin(tmp_dir, 'tmp_%d_%d.%s' % (len(urls), i, ext))
-                tmp_files.append(tmp_file)
-                self.dl_methods(url, tmp_file, referer=referer)
+                if url.strip().startswith('http'):
+                    tmp_file = pjoin(tmp_dir, 'tmp_%d_%d.%s' % (len(urls), i, ext))
+                    tmp_files.append(tmp_file)
+                    self.dl_methods(url, tmp_file, referer=referer)
         except Exception as e:
             raise e
         self.merge(tmp_files, file_name, ext)
@@ -81,7 +82,7 @@ class Downloader:
         for tmp_file in tmp_files:
             os.remove(tmp_file)
         os.removedirs(tmp_dir)
-        self.log.debug('[dl_end] ===> %s', file_name)
+        self.log.debug('[dl_sequence_end] ===> %s', file_name)
 
     def dl_methods(self, url, file_name, referer, retry=2):
         if os.path.exists(file_name):
@@ -107,13 +108,13 @@ class Downloader:
                 pass
             if result == 0:
                 os.rename(tmp_file, file_name)
-                self.log.debug('[dl_ok] %s', file_name)
+                self.log.debug('[finish] %s', file_name)
                 return
             else:
                 self.log.error('downloader failed({}) with result={}'.format(retry, result))
                 retry -= 1
                 if retry == 0:
-                    self.log.error('[dl_failed] %s(%s)', tmp_file, file_name)
+                    self.log.error('[failed] %s(%s)', tmp_file, file_name)
                     return
 
     def merge(self, files, file, ext):
