@@ -1,5 +1,13 @@
 [default]
-out_dir =
+out_dir = download
+;0/1/2/3
+format = 0
+log = ./log/dlvideo.log
+log_level = debug
+
+[network]
+nthread=10
+nperfile=5
 
 [script]
 cmd =
@@ -8,11 +16,16 @@ lib_dir =
 [u2b]
 cmd =
 proxy =
-cache =
-title_format =
-create_dir =
+cache = .u2cache
+title_format = %(title)s-%(id)s.%(ext)s
+create_dir = false
 
 [flvcd]
 default = true
-sohu.com = False
+sohu.com = false
 youku.com = true
+56.com = false
+tudou.com = false
+
+[filter]
+tudou.com = {'Referer': 'http://js.tudouui.com/bin/lingtong/PortalPlayer_108.swf',}
