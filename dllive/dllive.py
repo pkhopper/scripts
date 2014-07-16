@@ -2,7 +2,6 @@
 # coding=utf-8
 
 import os
-import sys
 import time
 import urllib
 import urllib2
@@ -10,10 +9,11 @@ import re
 import threading
 from time import sleep
 
-from vavava.httputil import HttpUtil
-from vavava.httputil import MiniAxel
-from vavava.httputil import DownloadStreamHandler
+from vavava.vavava.httputil import HttpUtil
+from vavava.vavava.httputil import MiniAxel
+from vavava.vavava.httputil import DownloadStreamHandler
 from vavava import util
+
 
 util.set_default_utf8()
 CHARSET = "utf-8"

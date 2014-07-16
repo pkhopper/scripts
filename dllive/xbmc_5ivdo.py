@@ -9,7 +9,9 @@ import sys
 import os
 import gzip
 import StringIO
+
 from vavava import util
+
 
 util.set_default_utf8()
 
