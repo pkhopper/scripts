@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
 from vavava import sqliteutil
 
 SQL_CREATE_TABLES = """
@@ -26,7 +25,7 @@ class Songs:
         self.db.get_connection()
         self.db.conn.executescript(SQL_CREATE_TABLES)
 
-    def is_inbase(self, code):
+    def exists(self, code):
         sql = r'select count(id) from song where code=%s'%code
         return self.db.fetch_one(sql)[0] > 0
 
