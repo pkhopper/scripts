@@ -3,8 +3,10 @@
 
 import os
 import sys
-from vavava import util
 import dl_helper
+from vavava import util
+
+
 util.set_default_utf8()
 import parsers
 
@@ -14,16 +16,13 @@ pabspath = os.path.abspath
 user_path = os.environ['HOME']
 
 class Config:
-    def __init__(self, config=None):
-        script_dir = util.get_file_path(__file__)
-        config_file = config
-        if config_file:
-            config_file = pabspath(config_file)
-        else:
-            config_file = pjoin(script_dir, 'config.ini')
+    def __init__(self, config='config.ini'):
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
-        cfg.read(config_file)
+        if os.path.exists(config):
+            cfg.read(pabspath(config))
+        else:
+            cfg.read(pjoin(util.script_path(__file__), config))
         self.out_dir = cfg.get('default', 'out_dir')
         self.format = cfg.getint('default', 'format')
         self.nthread = cfg.getint('network', 'nthread')

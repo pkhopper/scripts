@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 import json
-from vavava import httputil
-from base_types import *
+
 from util import r1
+from vavava import httputil
+
 
 class Iqiyi():
     def __init__(self):

@@ -2,8 +2,10 @@
 # coding=utf-8
 
 import BeautifulSoup
+
 from base_types import PlayListFilterBase
 from vavava.httputil import HttpUtil
+
 
 class YoukuPlaylist(PlayListFilterBase):
     def __items(self, html, soup):

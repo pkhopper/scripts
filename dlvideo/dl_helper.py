@@ -5,6 +5,7 @@ import os
 import sys
 from vavava import util
 
+
 default_encoding = sys.getfilesystemencoding()
 if default_encoding.lower() == 'ascii':
     default_encoding = 'utf-8'

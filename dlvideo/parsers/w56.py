@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-from re import search
+import json
+
 from base_types import *
 from util import *
 from vavava.httputil import HttpUtil
-import json
+
 
 def w56_download_by_id(id, refer, vidfmt=0, merge=True):
     html = HttpUtil().get('http://vxml.56.com/json/%s/?src=site'%id)
