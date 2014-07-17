@@ -9,11 +9,10 @@ import re
 import threading
 from time import sleep
 
-from vavava.vavava.httputil import HttpUtil
-from vavava.vavava.httputil import MiniAxel
-from vavava.vavava.httputil import DownloadStreamHandler
+from vavava.httputil import HttpUtil
+from vavava.httputil import MiniAxel
+from vavava.httputil import DownloadStreamHandler
 from vavava import util
-
 
 util.set_default_utf8()
 CHARSET = "utf-8"
@@ -21,20 +20,16 @@ pjoin = os.path.join
 pdirname = os.path.dirname
 pabspath = os.path.abspath
 
+
 class Config:
-    def __init__(self, config=None):
-        if os.path.islink(__file__):
-            script_dir = pdirname(pabspath(os.readlink(__file__)))
-        else:
-            script_dir = pdirname(pabspath(__file__))
-        config_file = config
-        if config_file:
-            config_file = pabspath(config_file)
-        else:
-            config_file = pjoin(script_dir, "config.ini")
+    def __init__(self, config="config.ini"):
+        # script_dir = util.script_path(__file__)
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
-        cfg.read(config_file)
+        if os.path.exists(config):
+            cfg.read(pabspath(config))
+        else:
+            cfg.read(pjoin(util.script_path(__file__), config))
         self.out_dir = cfg.get('default', 'out_dir')
         self.channel = cfg.get('default', 'channel')
         self.duration = cfg.getint('default', 'duration')
@@ -310,7 +305,7 @@ def main():
                  address_file=config.address_file, proxy=proxy)
         return
     elif args.channellist:
-        script_path = util.get_file_path(__file__)
+        script_path = util.script_path(__file__)
         os.system('python %s/xbmc_5ivdo.py -t 直播 > %s'%(
             script_path, config.address_file))
         return
