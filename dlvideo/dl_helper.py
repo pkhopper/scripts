@@ -45,7 +45,7 @@ class Downloader:
         self.nperfile = nperfile
         self.nthread = nthread
 
-    def download(self, urls, title, out_dir, ext=None, referer=None):
+    def download(self, urls, title, out_dir, ext=None, headers=None):
         if not ext:
             ext = guess_ext(urls, title)
         title = to_native_string(title)
@@ -75,7 +75,7 @@ class Downloader:
                 if url.strip().startswith('http'):
                     tmp_file = pjoin(tmp_dir, 'tmp_%d_%d.%s' % (len(urls), i, ext))
                     tmp_files.append(tmp_file)
-                    self.dl_methods(url, tmp_file, referer=referer)
+                    self.dl_methods(url, tmp_file, headers=headers)
         except Exception as e:
             raise e
         if len(tmp_files) == 1:
@@ -89,7 +89,7 @@ class Downloader:
         os.removedirs(tmp_dir)
         self.log.debug('[dl_sequence_end] ===> %s', file_name)
 
-    def dl_methods(self, url, file_name, referer, retry=2):
+    def dl_methods(self, url, file_name, headers, retry=2):
         if os.path.exists(file_name):
             self.log.debug("download file exists, abort.: %s", file_name)
             return
@@ -101,10 +101,10 @@ class Downloader:
             try:
                 if self.nperfile == 1:
                     # 1:
-                    result = Wget().get(url=url, out=tmp_file, referer=referer)
+                    result = Wget().get(url=url, out=tmp_file, headers=headers)
                 else:
                     # 2:
-                    result = Axel().get(url=url, out=tmp_file, n=self.nthread, referer=referer)
+                    result = Axel().get(url=url, out=tmp_file, n=self.nthread, headers=headers)
                 # 3
                 # print 'Downloading %s ...' % filename
                 # url_save(url, tmp_file, bar, refer=refer)
@@ -141,10 +141,14 @@ class Wget:
         reload(sys)
         sys.setdefaultencoding('utf-8')
         self.useragent = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.149 Safari/537.36'
-    def get(self, url, out=None, referer=None, proxy=None):
+    def get(self, url, out=None, headers=None, proxy=None):
         cmd = "wget -c --user-agent='%s'"%(self.useragent)
-        if referer:
-            cmd += " --referer='%s'"%(referer)
+        if headers:
+            for k, v in headers.items():
+                if k in ('referer'):
+                    cmd += " --referer='%s'"%(v)
+                else:
+                    cmd += " --header='%s:%s'"%(k, v)
         if out:
             cmd += " --output-document='%s'"%(out)
         if not proxy:
@@ -160,10 +164,11 @@ class Axel:
         sys.setdefaultencoding('utf-8')
         self.useragent = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.149 Safari/537.36'
 
-    def get(self, url, out=None, n=None, referer=None):
+    def get(self, url, out=None, n=None, headers=None):
         cmd = "axel -v -a -U '%s'"%(self.useragent)
-        if referer:
-            cmd += " -H 'Referer:%s'"%(referer)
+        if headers:
+            for k, v in headers.items():
+                cmd += " -H '%s:%s'"%(k, v)
         if n:
             cmd += " -n %d"%(n)
         if out:

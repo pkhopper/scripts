@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+import sys
+reload(sys).setdefaultencoding("utf8")
 import tudou
 import sohu
 import w56
 import iqiyi
 import youku
+import flvcd
 
 def getVidPageParser(url):
     if url.find('sohu.com') > 0:
@@ -17,7 +20,7 @@ def getVidPageParser(url):
     elif url.find('iqiyi.com') > 0:
         return iqiyi.Iqiyi()
     else:
-        raise NotImplementedError(url)
+        return flvcd.FLVCD()
 
 def getPlayListParser(url):
     if url.find('youku.com') > 0:

@@ -65,54 +65,18 @@ def dl_u2b(url, argv):
     log.debug('==> %s', cmd)
     os.system(cmd)
 
-def dl_flvcd(url):
-    from urllib import quote
-    from re import findall
-    from vavava.httputil import HttpUtil
-    parse_url = 'http://www.flvcd.com/parse.php?'
-    parse_url += 'kw='+ quote(url)
-    parse_url += '&flag=one'
-    format = ['', 'high', 'super', 'real']
-    if config.format > 0:
-        parse_url += '&format=%s'%format[config.format]
-    http = HttpUtil()
-    http.add_header('Referer', parse_url)
-    html = http.get(parse_url).decode('gb2312')
-    try:
-        m3u = findall(r'name="inf" value="(?P<as>[^"]*)"', html)[0]
-        title = findall(u'<strong>当前解析视频：</strong>(?P<as>[^<]*)<strong>', html)[0]
-    except:
-        print 'not support'
-        os.system('say "not support."')
-        return
-    title = title.strip()
-    downloader = dl_helper.Downloader(
-        nperfile=config.nperfile, nthread=config.nthread, log=log)
-    urls = [url for url in m3u.split('|')]
-    downloader.download(urls, title=title, out_dir=config.out_dir)
-    return title
-
-def dl_dispatch(url):
-    local_file = None
+def dispatch(url):
     if url.find("youtube.com") >= 0:
         dl_u2b(url, sys.argv[2:])
-    elif config.flvcd['default']:
-        import re
-        available_4flvcd = \
-            lambda x: re.findall(r'(?P<as>[^\\/\.]*\.[^\\/\.]*)[\\|/]', x.lower())[0]
-        site = available_4flvcd(url)
-        if site not in config.flvcd or config.flvcd[site]:
-            local_file = dl_flvcd(url)
-        else:
-            urls, title, ext, nperfile, referer = \
-                parsers.getVidPageParser(url).info(url, vidfmt=config.format)
-            downloader = dl_helper.Downloader(
-                nperfile=config.nperfile, nthread=config.nthread, log=log)
-            if nperfile == 1:
-                downloader.nperfile = 1
-            downloader.download(
-                urls, title=title, out_dir=config.out_dir, ext=ext, referer=referer)
-        # log.info(r"[O.F.] %s" % local_file)
+    else:
+        urls, title, ext, nperfile, headers = \
+            parsers.getVidPageParser(url).info(url, vidfmt=config.format)
+        downloader = dl_helper.Downloader(
+            nperfile=config.nperfile, nthread=config.nthread, log=log)
+        if nperfile == 1:
+            downloader.nperfile = 1
+        downloader.download(
+            urls, title=title, out_dir=config.out_dir, ext=ext, headers=headers)
 
 def parse_args(config):
     import argparse
@@ -154,7 +118,7 @@ def main():
     for url in args.urls:
         try:
             log.info('[START] %s', url)
-            dl_dispatch(url)
+            dispatch(url)
             log.info('[END] %s', url)
         except KeyboardInterrupt as e:
             raise e

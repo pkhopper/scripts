@@ -31,3 +31,8 @@ class YoukuPlaylist(PlayListFilterBase):
         self.title = self.__title(html, soup)
         self.items = self.__items(html, soup)
         return self.title, self.items
+
+if __name__ == "__main__":
+    url = r'http://www.youku.com/show_page/id_zcbfdc4cc962411de83b1.html'
+    YoukuPlaylist().info(url)
+
