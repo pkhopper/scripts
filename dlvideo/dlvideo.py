@@ -82,10 +82,12 @@ def parse_args(config):
     import argparse
     usage = """./dlvideo [-m][-l][-c config][-o output][-f format] url ..."""
     parser=argparse.ArgumentParser(usage=usage, description='download net video', version='0.1')
-    parser.add_argument('urls', nargs='+', help='urls')
+    parser.add_argument('urls', nargs='*', help='urls')
+    # parser.add_argument('urls', nargs='+', help='urls')
     parser.add_argument('-c', '--config', default='config.ini')
     parser.add_argument('-o', '--odir')
-    parser.add_argument('--play-list', '-l', dest='play_list', action='store_true')
+    parser.add_argument('-i', '--interact', action='store_true')
+    parser.add_argument('-l', '--play-list', dest='play_list', action='store_true')
     parser.add_argument('-f', '--format', help='video format:super, normal',choices=['0', '1', '2', '3'])
     args = parser.parse_args()
     # print args
@@ -116,12 +118,18 @@ def main():
         config.out_dir = pjoin(config.out_dir, out_dir)
         util.assure_path(config.out_dir)
         with open('url.txt', 'w') as fp:
-            fp.writelines([url])
-    for url in args.urls:
+            fp.writelines([url + "\n\n"])
+            for i, clip in enumerate(args.urls):
+                fp.writelines(["[%03d] %s\n"%(i, clip)])
+    if args.interact:
+        import interface
+        args.urls = interface.UserInterface(config.out_dir).console()
+
+    for i, url in enumerate(args.urls):
         try:
-            log.info('[START] %s', url)
+            log.info('[==START==][%03d/%03d] %s', i, len(args.urls), url)
             dispatch(url)
-            log.info('[END] %s', url)
+            log.info('[==END==][%03d/%03d] %s', i, len(args.urls), url)
         except KeyboardInterrupt as e:
             raise e
         except Exception as e:
