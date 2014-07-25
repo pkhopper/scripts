@@ -55,19 +55,11 @@ class Downloader:
         if exists(file_name):
             self.log.info('out put file exists, %s', file_name)
             return
-        if exists(tmp_dir):
-            self.log.info('tmp file exists, try resume.')
-            # with open(cfg_file, 'r') as fp:
-            #     recode_urls = fp.readlines()
-            #     for i, url in enumerate(recode_urls):
-            #         url = url.replace('\n', '')
-            #         if url.find(urls[i]) == 0:
-            #             self.log.error('urls not mach:\n%s\n%s', url, urls[i])
-            #             return
         else:
             util.assure_path(tmp_dir)
             with open(cfg_file, 'w') as fp:
-                fp.writelines(urls)
+                for url in urls:
+                    fp.writelines([url + "\n"])
         tmp_files = []
         self.log.debug('[dl_sequence_start] ===> %s', file_name)
         try:

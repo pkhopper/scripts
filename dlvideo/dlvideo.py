@@ -114,7 +114,9 @@ def main():
         url = args.urls[0]
         out_dir, args.urls = parsers.getPlayListParser(url).info(url)
         config.out_dir = pjoin(config.out_dir, out_dir)
-        # util.assure_path(config.out_dir)
+        util.assure_path(config.out_dir)
+        with open('url.txt', 'w') as fp:
+            fp.writelines([url])
     for url in args.urls:
         try:
             log.info('[START] %s', url)
