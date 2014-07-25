@@ -6,10 +6,13 @@ import getopt
 import json
 import urllib
 import urllib2
+
 from lxml import etree
-import vavava
+
 from vavava import util
 from vavava import httputil
+
+
 search_url = r'http://movie.douban.com/j/subject_suggest?q=%s'
 search_page_url = r'http://movie.douban.com/subject_search?search_text=%s&cat=1002'
 
@@ -31,7 +34,7 @@ class Search:
                 print 'url: ', movie['url']
                 print 'img: ', movie['img']
 
-import re
+
 class SearchPage:
     def __init__(self):
         self.http = httputil.HttpUtil(charset='utf-8')
