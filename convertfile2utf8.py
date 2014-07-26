@@ -1,10 +1,10 @@
 #encoding=utf-8
 
 import os
-import sys
-import shutil
 import codecs
+
 from vavava import util
+
 
 util.set_default_utf8()
 BUFFERSIZE = 1024*1024

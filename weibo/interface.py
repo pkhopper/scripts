@@ -2,12 +2,13 @@
 # coding=utf-8
 
 import sys
-import os
-import time
 import getopt
 import Queue
 import curses
+
 from vavava import util
+
+
 log = util.get_logger()
 import weibotop
 
