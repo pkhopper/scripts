@@ -140,12 +140,14 @@ if __name__ == "__main__":
     # signal_handler = util.SignalHandlerBase()
     try:
         main()
-        os.system(r'say "download finished!!"')
+        if util.check_cmd('say'):
+            os.system(r'say "download finished!!"')
     except KeyboardInterrupt as e:
         print 'stop by user'
         exit(0)
     except Exception as e:
-        os.system(r'say "download failed!!"')
+        if util.check_cmd('say'):
+            os.system(r'say "download failed!!"')
         raise
 
 
