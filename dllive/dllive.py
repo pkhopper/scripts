@@ -105,9 +105,32 @@ class M3u8:
         return lines, targetduration
 
     def get_curr_stream(self, url, url_base, duration, ofp):
+        self.threads = []
+        name_index = 0
+        count = 0
+        tmp_files = []
+        util.assure_path(pjoin(config.out_dir, '.dllive'))
         urls, targetduration = self.get_curr_index(url, url_base)
-        # count = self.__dl_single(urls, ofp=ofp, duration=duration)
-        count = self.__dl_multiple(urls, ofp=ofp, duration=duration)
+        for url in urls:
+            if not self.old_urls.has_key(url):
+                log.debug('Download m3u8 ts: %s', url)
+                name_index += 1
+                tmp_file = '{}.{}.tmp'.format(name_index, hash(url))
+                tmp_file = pjoin(config.out_dir, '.dllive', tmp_file)
+                tmp_files.append((tmp_file, url))
+                thread = M3u8.DownloadThread(url, filename=tmp_file, duration=duration)
+                self.threads.append(thread)
+                count += 1
+        for i, th in enumerate(self.threads):
+            th.join()
+            if not th.finish:
+                raise ValueError('thread exit with unfinished work.[%d]'%i)
+        for i, th in enumerate(self.threads):
+            log.debug('==> write file: %s', tmp_files[i][0])
+            with open(tmp_files[i][0], 'r') as fp:
+                ofp.write(fp.read())
+            os.remove(tmp_files[i][0])
+            self.old_urls[tmp_files[i][1]] = ''
         return count, len(urls), targetduration
 
     def __dl_single(self, urls, ofp, duration):
@@ -119,33 +142,6 @@ class M3u8:
                 self.http.fetch(url, download_handle)
                 self.old_urls[url] = ''
                 count += 1
-        return count
-
-    def __dl_multiple(self, urls, ofp, duration):
-        self.threads = []
-        name_index = 0
-        count = 0
-        tmp_files = []
-        util.assure_path(pjoin(config.out_dir, '.dllive'))
-        for url in urls:
-            if not self.old_urls.has_key(url):
-                log.debug('Download m3u8 ts: %s', url)
-                name_index += 1
-                tmp_file = '{}.{}.tmp'.format(name_index, hash(url))
-                tmp_file = pjoin(config.out_dir, '.dllive', tmp_file)
-                tmp_files.append((tmp_file, url))
-                self.threads.append(M3u8.DownloadThread(url, filename=tmp_file, duration=duration))
-                count += 1
-        for i, th in enumerate(self.threads):
-            th.join()
-            if not th.finish:
-                log.error('thread exit with unfinished work.[%d]'%i)
-                break
-            log.debug('==> write file: %s', tmp_files[i][0])
-            with open(tmp_files[i][0], 'r') as fp:
-                ofp.write(fp.read())
-            os.remove(tmp_files[i][0])
-            self.old_urls[tmp_files[i][1]] = ''
         return count
 
     def dl_stream(self, url, url_base, duration, ofp):
