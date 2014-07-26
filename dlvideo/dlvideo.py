@@ -117,7 +117,7 @@ def main():
         out_dir, args.urls = parsers.getPlayListParser(url).info(url)
         config.out_dir = pjoin(config.out_dir, out_dir)
         util.assure_path(config.out_dir)
-        with open('url.txt', 'w') as fp:
+        with open(pjoin(config.out_dir, 'url.txt'), 'w') as fp:
             fp.writelines([url + "\n\n"])
             for i, clip in enumerate(args.urls):
                 fp.writelines(["[%03d] %s\n"%(i, clip)])
