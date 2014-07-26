@@ -113,7 +113,8 @@ class Downloader:
             if util.check_cmd('axel'):
                 return Axel().get(url=url, out=file_name, n=self.nthread, headers=headers)
         with open(file_name, 'w') as fp:
-            return httputil.MiniAxel().dl(url, fp, headers=headers, n=nperfile)
+            miniaxel = httputil.MiniAxel(progress_bar=httputil.ProgressBar())
+            return miniaxel.dl(url, fp, headers=headers, n=nperfile)
 
     def merge(self, files, file, ext):
         if len(files) < 2:
