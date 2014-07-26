@@ -4,6 +4,7 @@
 import os
 import sys
 from vavava import util
+from vavava import httputil
 
 
 default_encoding = sys.getfilesystemencoding()
@@ -83,36 +84,36 @@ class Downloader:
 
     def dl_methods(self, url, file_name, headers, retry=2):
         if os.path.exists(file_name):
-            self.log.debug("download file exists, abort.: %s", file_name)
+            self.log.info("file exists, abort: %s", file_name)
             return
         self.log.info('[dl] %s', file_name)
-        # 3 methods to download url
         tmp_file = file_name + '!'
         result = 0
         while True:
             try:
-                if self.nperfile == 1:
-                    # 1:
-                    result = Wget().get(url=url, out=tmp_file, headers=headers)
-                else:
-                    # 2:
-                    result = Axel().get(url=url, out=tmp_file, n=self.nthread, headers=headers)
-                # 3
-                # print 'Downloading %s ...' % filename
-                # url_save(url, tmp_file, bar, refer=refer)
-                # bar.done()
-            except:
-                pass
-            if result == 0:
+                self.dl_processor(url, file_name=tmp_file, headers=headers, nperfile=self.nperfile)
                 os.rename(tmp_file, file_name)
                 self.log.debug('[finish] %s', file_name)
                 return
-            else:
+            except KeyboardInterrupt as e:
+                return
+            except Exception as e:
+                self.log.exception(e)
                 self.log.error('downloader failed({}) with result={}'.format(retry, result))
                 retry -= 1
                 if retry == 0:
                     self.log.error('[failed] %s(%s)', tmp_file, file_name)
                     return
+
+    def dl_processor(self, url, file_name, headers, nperfile=1):
+        if nperfile == 1:
+            if util.check_cmd('wget'):
+                return Wget().get(url=url, out=file_name, headers=headers)
+        else:
+            if util.check_cmd('axel'):
+                return Axel().get(url=url, out=file_name, n=self.nthread, headers=headers)
+        with open(file_name, 'w') as fp:
+            return httputil.MiniAxel().dl(url, fp, headers=headers, n=nperfile)
 
     def merge(self, files, file, ext):
         if len(files) < 2:
@@ -146,9 +147,13 @@ class Wget:
         if not proxy:
             cmd += " --no-proxy"
         cmd += " '%s'"%(url)
-        print cmd
-        return os.system(cmd)
+        self.__exec(cmd)
 
+    def __exec(self, cmd):
+        print cmd
+        self.result = os.system(cmd)
+        if self.result != 0:
+            raise StandardError("result=%d  %s"%(self.result, cmd))
 
 class Axel:
     def __init__(self):
@@ -166,8 +171,13 @@ class Axel:
         if out:
             cmd += " -o '%s'"%(out)
         cmd += " '%s'"%(url)
+        self.__exec(cmd)
+
+    def __exec(self, cmd):
         print cmd
-        return os.system(cmd)
+        self.result = os.system(cmd)
+        if self.result != 0:
+            raise StandardError("result=%d  %s"%(self.result, cmd))
 
 if __name__ == '__main__':
     pass
