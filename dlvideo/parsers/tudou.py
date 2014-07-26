@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import re
-import BeautifulSoup
+from bs4 import BeautifulSoup
 from base_types import VidParserBase
 from util import r1, unescape_html
 from vavava.httputil import HttpUtil

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 
-import BeautifulSoup
+from bs4 import BeautifulSoup
 
 from base_types import PlayListFilterBase
 from vavava.httputil import HttpUtil

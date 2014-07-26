@@ -20,7 +20,7 @@ class FLVCD(VidParserBase):
         http.add_header('Referer', parse_url)
         html = http.get(parse_url).decode('gb2312')
         try:
-            import BeautifulSoup
+            from bs4 import BeautifulSoup
             soup = BeautifulSoup.BeautifulSoup(html)
             m3u = soup.find('input', attrs={'name': 'inf'}).get('value')
             title = soup.find('input', attrs={'name': 'name'}).get('value')
