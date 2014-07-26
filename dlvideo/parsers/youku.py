@@ -27,7 +27,7 @@ class YoukuPlaylist(PlayListFilterBase):
         if url.find('youku.com') < 0:
             raise ValueError('not a youku.com video url')
         html = HttpUtil().get(url)
-        soup = BeautifulSoup.BeautifulSoup(html)
+        soup = BeautifulSoup(html)
         self.title = self.__title(html, soup)
         self.items = self.__items(html, soup)
         return self.title, self.items

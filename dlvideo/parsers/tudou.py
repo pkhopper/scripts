@@ -20,7 +20,7 @@ def tudou_download_by_iid(iid, title):
     url = r'http://v2.tudou.com/f?id=' + iid + r'&sid=11000&hd=2&sj=1&areaCode=110000'
     xml = HttpUtil().get(url)
     xml = unescape_html(xml)
-    url = BeautifulSoup.BeautifulSoup(xml).find('f').text
+    url = BeautifulSoup(xml).find('f').text
     return url, title, 'flv', 1, headers
 
 # def tudou_download_by_id(id, title, merge=True):

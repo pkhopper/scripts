@@ -18,10 +18,11 @@ class FLVCD(VidParserBase):
             parse_url += '&format=%s'%format[vidfmt]
         http = HttpUtil()
         http.add_header('Referer', parse_url)
+        print parse_url
         html = http.get(parse_url).decode('gb2312')
         try:
             from bs4 import BeautifulSoup
-            soup = BeautifulSoup.BeautifulSoup(html)
+            soup = BeautifulSoup(html)
             m3u = soup.find('input', attrs={'name': 'inf'}).get('value')
             title = soup.find('input', attrs={'name': 'name'}).get('value')
         except:
@@ -33,8 +34,9 @@ def test():
     url = r'http://www.iqiyi.com/dianshiju/20120730/9682f22c54d70f29.html'
     url = r'http://www.tudou.com/programs/view/hVT9-loKZ_M/'
     url = r'http://v.youku.com/v_show/id_XNzQzNTc0Nzgw.html'
+    url = r'http://v.youku.com/v_show/id_XNzIzNjYxNTMy.html'
     flvcd = FLVCD()
-    flvcd.info(url, 0)
+    print flvcd.info(url, 0)
 
 
 if __name__ == '__main__':
