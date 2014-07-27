@@ -113,58 +113,60 @@ class Downloader:
         concat(files, out)
 
 
-class Wget:
-
-    def __init__(self):
-        self.useragent = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) ' \
-                         r'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' \
-                         r'33.0.1750.149 Safari/537.36'
-
-    def get(self, url, out=None, headers=None, proxy=None):
-        cmd = "wget -c --user-agent='%s'" % (self.useragent)
-        if headers:
-            for k, v in headers.items():
-                if k in ('referer'):
-                    cmd += " --referer='%s'" % (v)
-                else:
-                    cmd += " --header='%s:%s'" % (k, v)
-        if out:
-            cmd += " --output-document='%s'" % (out)
-        if not proxy:
-            cmd += " --no-proxy"
-        cmd += " '%s'" % (url)
-        self.__exec(cmd)
-
-    def __exec(self, cmd):
-        print cmd
-        self.result = os.system(cmd)
-        if self.result != 0:
-            raise StandardError("result=%d  %s" % (self.result, cmd))
-
-
-class Axel:
-    def __init__(self):
-        self.useragent = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) ' \
-                         r'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.149 ' \
-                         r'Safari/537.36'
-
-    def get(self, url, out=None, n=None, headers=None):
-        cmd = "axel -v -a -U '%s'" % (self.useragent)
-        if headers:
-            for k, v in headers.items():
-                cmd += " -H '%s:%s'" % (k, v)
-        if n:
-            cmd += " -n %d" % (n)
-        if out:
-            cmd += " -o '%s'" % (out)
-        cmd += " '%s'" % (url)
-        self.__exec(cmd)
-
-    def __exec(self, cmd):
-        print cmd
-        self.result = os.system(cmd)
-        if self.result != 0:
-            raise StandardError("result=%d  %s" % (self.result, cmd))
-
 if __name__ == '__main__':
     pass
+
+
+#
+# class Wget:
+#
+#     def __init__(self):
+#         self.useragent = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) ' \
+#                          r'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' \
+#                          r'33.0.1750.149 Safari/537.36'
+#
+#     def get(self, url, out=None, headers=None, proxy=None):
+#         cmd = "wget -c --user-agent='%s'" % (self.useragent)
+#         if headers:
+#             for k, v in headers.items():
+#                 if k in ('referer'):
+#                     cmd += " --referer='%s'" % (v)
+#                 else:
+#                     cmd += " --header='%s:%s'" % (k, v)
+#         if out:
+#             cmd += " --output-document='%s'" % (out)
+#         if not proxy:
+#             cmd += " --no-proxy"
+#         cmd += " '%s'" % (url)
+#         self.__exec(cmd)
+#
+#     def __exec(self, cmd):
+#         print cmd
+#         self.result = os.system(cmd)
+#         if self.result != 0:
+#             raise StandardError("result=%d  %s" % (self.result, cmd))
+#
+#
+# class Axel:
+#     def __init__(self):
+#         self.useragent = r'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) ' \
+#                          r'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.149 ' \
+#                          r'Safari/537.36'
+#
+#     def get(self, url, out=None, n=None, headers=None):
+#         cmd = "axel -v -a -U '%s'" % (self.useragent)
+#         if headers:
+#             for k, v in headers.items():
+#                 cmd += " -H '%s:%s'" % (k, v)
+#         if n:
+#             cmd += " -n %d" % (n)
+#         if out:
+#             cmd += " -o '%s'" % (out)
+#         cmd += " '%s'" % (url)
+#         self.__exec(cmd)
+#
+#     def __exec(self, cmd):
+#         print cmd
+#         self.result = os.system(cmd)
+#         if self.result != 0:
+#             raise StandardError("result=%d  %s" % (self.result, cmd))

@@ -112,7 +112,7 @@ class M3u8:
         util.assure_path(pjoin(config.out_dir, '.dllive'))
         urls, targetduration = self.get_curr_index(url, url_base)
         for url in urls:
-            if not self.old_urls.has_key(url):
+            if url not in self.old_urls:
                 log.debug('Download m3u8 ts: %s', url)
                 name_index += 1
                 tmp_file = '{}.{}.tmp'.format(name_index, hash(url))
@@ -124,7 +124,7 @@ class M3u8:
         for i, th in enumerate(self.threads):
             th.join()
             if not th.finish:
-                raise ValueError('thread exit with unfinished work.[%d]'%i)
+                raise ValueError('thread exit with unfinished work.[%d]' % i)
         for i, th in enumerate(self.threads):
             log.debug('==> write file: %s', tmp_files[i][0])
             with open(tmp_files[i][0], 'r') as fp:
@@ -136,7 +136,7 @@ class M3u8:
     def __dl_single(self, urls, ofp, duration):
         count = 0
         for url in urls:
-            if not self.old_urls.has_key(url):
+            if url not in self.old_urls:
                 log.debug('Download m3u8 ts: %s', url)
                 download_handle = DownloadStreamHandler(ofp, duration)
                 self.http.fetch(url, download_handle)
@@ -172,6 +172,7 @@ class M3u8:
                 log.debug('sleep(%d)', wait)
                 sleep(wait)
 
+
     class DownloadThread:
         def __init__(self, url, filename, duration=0):
             self.url = url
@@ -181,14 +182,10 @@ class M3u8:
             self.finish = False
             self.join = self.thread.join
             self.thread.start()
-        def _run(self,*_args, **_kwargs):
-            with open(self.filename, 'w') as fp:
-                # # 1.
-                # download_handle = DownloadStreamHandler(fp, self.duration)
-                # HttpUtil().fetch(self.url, download_handle)
-                # 2.
-                MiniAxel().dl(self.url, fp=fp, n=3)
-                self.finish = True
+
+        def _run(self, *_args, **_kwargs):
+            MiniAxel().dl(self.url, out=self.filename, n=3)
+            self.finish = True
             log.debug('--> file download ok: %s', self.filename)
 
 
@@ -200,7 +197,7 @@ class DownloadLiveStream:
         self.duration = duration
         self.none_stop = duration == 0
         self.odir = out_dir
-        self.http = HttpUtil(charset="utf-8", timeout=10)
+        self.http = HttpUtil(timeout=10)
         if proxy:
             self.http.set_proxy({'http': proxy})
         self.m3u8 = M3u8(self.http)
