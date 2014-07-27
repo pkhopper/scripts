@@ -69,14 +69,12 @@ def dispatch(url):
     if url.find("youtube.com") >= 0:
         dl_u2b(url, sys.argv[2:])
     else:
-        urls, title, ext, nperfile, headers = \
-            parsers.getVidPageParser(url).info(url, vidfmt=config.format)
-        downloader = dl_helper.Downloader(
-            nperfile=config.nperfile, nthread=config.nthread, log=log)
-        if nperfile == 1:
-            downloader.nperfile = 1
-        downloader.download(
-            urls, title=title, out_dir=config.out_dir, ext=ext, headers=headers)
+        parser = parsers.getVidPageParser(url)
+        urls, title, ext, nperfile, headers = parser.info(url, vidfmt=config.format)
+        if nperfile != 1:
+            nperfile = config.nperfile
+        downloader = dl_helper.Downloader(nperfile=nperfile, nthread=config.nthread, log=log)
+        downloader.download(urls, title=title, out_dir=config.out_dir, ext=ext, headers=headers)
 
 def parse_args(config):
     import argparse
