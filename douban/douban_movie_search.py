@@ -20,7 +20,7 @@ util.set_default_utf8()
 
 class Search:
     def __init__(self):
-        self.http = httputil.HttpUtil(charset='utf-8')
+        self.http = httputil.HttpUtil()
     def search(self, keyword):
         str = search_url%urllib2.quote(keyword)
         data = self.http.get(str)
@@ -37,7 +37,7 @@ class Search:
 
 class SearchPage:
     def __init__(self):
-        self.http = httputil.HttpUtil(charset='utf-8')
+        self.http = httputil.HttpUtil()
     def search(self, keyword):
         str = search_page_url%urllib.quote(keyword)
         data = self.http.get(str).decode('utf-8')
