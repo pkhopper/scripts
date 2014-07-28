@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from urllib import quote
-from re import findall
 from vavava.httputil import HttpUtil
 from base_types import VidParserBase
 import vavava.util
@@ -19,13 +18,14 @@ class FLVCD(VidParserBase):
         http = HttpUtil()
         http.add_header('Referer', parse_url)
         print parse_url
-        html = http.get(parse_url).decode('gb2312')
         try:
+            html = http.get(parse_url).decode('gb2312', 'ignore')
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(html)
             m3u = soup.find('input', attrs={'name': 'inf'}).get('value')
             title = soup.find('input', attrs={'name': 'name'}).get('value')
-        except:
+        except Exception as e:
+            print e
             raise ValueError('not support')
         urls = [url for url in m3u.split('|')]
         return urls, title, None, 5, None
