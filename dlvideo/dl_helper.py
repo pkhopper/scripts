@@ -73,8 +73,8 @@ class Downloader:
                     tmp_file = pjoin(tmp_dir, 'tmp_%d_%d.%s' % (len(urls), i, ext))
                     tmp_files.append(tmp_file)
                     self.dl_methods(url, tmp_file, headers=headers)
-        except Exception as e:
-            raise e
+        except:
+            raise
         if len(tmp_files) == 1:
             os.rename(tmp_files[0], file_name)
         else:
@@ -90,13 +90,13 @@ class Downloader:
         if os.path.exists(file_name):
             self.log.info("file exists, abort: %s", file_name)
             return
-        self.log.info('[dl] %s', file_name)
+        self.log.info('==> dl: %s, %s', file_name, url)
         tmp_file = file_name + '!'
         progress_bar = httputil.ProgressBar()
         self.miniaxel = httputil.MiniAxel(progress_bar=progress_bar, retransmission=True)
         self.miniaxel.dl(url, tmp_file, headers=headers, n=self.nperfile)
         os.rename(tmp_file, file_name)
-        self.log.debug('[finish] %s', file_name)
+        self.log.debug('==> finish: %s', file_name)
 
     def merge(self, files, out, ext):
         if len(files) < 2:
