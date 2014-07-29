@@ -10,7 +10,7 @@ from time import sleep
 
 from vavava.httputil import HttpUtil
 from vavava.httputil import MiniAxel
-from vavava.httputil import DownloadStreamHandler
+from vavava.httputil import HttpDownloadClipHandler
 from vavava import util
 from vavava.threadutil import ThreadBase, ThreadManager
 
@@ -216,7 +216,7 @@ class ClipDownloader(ThreadBase):
 
     def run(self):
         try:
-            self.dl_handler = DownloadStreamHandler(fp=self.fp)
+            self.dl_handler = HttpDownloadClipHandler(fp=self.fp)
         except:
             if self.dl_handler:
                 self.dl_handler.stop_dl()
