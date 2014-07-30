@@ -1,0 +1,10 @@
+[default]
+out_dir =
+retrans = True
+threadnum = 5
+log_level = debug
+log_file = ./miniaxel.log
+
+[proxy]
+enable = false
+addr =
