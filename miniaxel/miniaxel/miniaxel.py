@@ -41,6 +41,7 @@ class DownloadUrl:
         self.finish = False
         self.__err_ev = _Event()
         self.fp = None
+        self.mutex = _Lock()
 
     def __get_data_size(self, url):
         info = HttpUtil().head(url)
@@ -48,8 +49,6 @@ class DownloadUrl:
             return int(info.getheader('Content-Length'))
 
     def getWorks(self):
-        self.mgr = threadutil.ThreadManager()
-        mutex = _Lock()
         cur_size = 0
         size = self.__get_data_size(self.url)
         clips = self.__div_file(size, self.n)
@@ -70,14 +69,14 @@ class DownloadUrl:
         else:
             self.fp = open(self.out_name, 'wb')
 
-        self.works = []
+        self.subworks = []
         for clip in clips:
             work = DownloadUrl.HttpDownloadWork(url=self.url, fp=self.fp, range=clip,
-                                                mutex=mutex, parent=self)
-            self.works.append(work)
+                                                mutex=self.mutex, parent=self)
+            self.subworks.append(work)
 
         self.__err_ev.clear()
-        return self.works
+        return self.subworks
 
     def __div_file(self, size, n):
         minsize = 1024
@@ -96,12 +95,12 @@ class DownloadUrl:
         return self.__err_ev.isSet()
 
     def terminate(self):
-        for work in self.works:
+        for work in self.subworks:
             work.terminateWork()
 
-    def isAchived(self):
+    def isArchived(self):
         if not self.isErrorHappen():
-            for work in self.works:
+            for work in self.subworks:
                 if work.isWorking():
                     return False
         return True
@@ -212,26 +211,25 @@ class MiniAxelWorkShop(threadutil.WorkShop, threadutil.ThreadBase):
                 urlwk = self.url_works_qu.get()
                 self.addWorks(urlwk.getWorks())
                 self.url_works.append(urlwk)
-                self.log.debug('get a work: %s', urlwk.url)
+                # self.log.debug('[ws] get a work: %s', urlwk.url)
 
             for i, urlwk in enumerate(self.url_works):
                 urlwk.display()
                 if urlwk.isErrorHappen():
-                    self.log.debug('err work: %s', urlwk.url)
+                    self.log.debug('[axel] work err: %s', urlwk.url)
                     urlwk.terminate()
-                if urlwk.isAchived() or urlwk.isErrorHappen():
+                if urlwk.isArchived() or urlwk.isErrorHappen():
                     urlwk.cleanUp()
-                    self.log.debug('cleanup a work: %s', urlwk.url)
+                    self.log.debug('[axel] work cleanup: %s', urlwk.url)
                     del self.url_works[i]
                     break
 
             duration = _time() - start_at
             if duration < 1:
-                # self.log.debug('[mini] duration = %f', duration)
                 _sleep(1)
 
     def run(self):
-        self.log.debug('== axel start serving')
+        self.log.debug('[axel] start serving')
         try:
             self.serve()
             self.__loop()
@@ -243,7 +241,7 @@ class MiniAxelWorkShop(threadutil.WorkShop, threadutil.ThreadBase):
                 urlwk.cleanUp()
             self.setShopClose()
             self.waitShopClose()
-        self.log.debug('== axel stop serving')
+        self.log.debug('[axel] stop serving')
 
 
 class ProgressBar:
