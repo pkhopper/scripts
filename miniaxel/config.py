@@ -11,7 +11,7 @@ pabspath = os.path.abspath
 
 class Config:
 
-    def __init__(self, config='config.ini'):
+    def __init__(self, config='miniaxel.ini'):
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
         if os.path.exists(config):
@@ -19,10 +19,14 @@ class Config:
         else:
             cfg.read(pjoin(_script_path(__file__), config))
         self.out_dir = cfg.get('default', 'out_dir')
-        self.format = cfg.getboolean('default', 'retrans')
+        self.retrans = cfg.getboolean('default', 'retrans')
         self.threadnum = cfg.getint('default', 'threadnum')
         self.log_level = cfg.get('default', 'log_level')
         self.log_file = cfg.get('default', 'log_file')
+        if cfg.getboolean('proxy', 'enable'):
+            self.proxy = cfg.get('proxy', 'addr')
+        else:
+            self.proxy = None
         lvlconvert = {
             'critical' : 50,
             'fatal' : 50,
@@ -42,11 +46,11 @@ def parse_args(cfg, prog):
     import argparse
     parser=argparse.ArgumentParser(prog=prog, usage=usage, description='mini axel', version='0.1')
     parser.add_argument('urls', nargs='*', help='urls')
-    parser.add_argument('-c', '--config', default='config.ini')
+    parser.add_argument('-c', '--config', default='miniaxel.ini')
     parser.add_argument('-r', '--retransmission', action='store_true', default=cfg.retrans)
     parser.add_argument('-o', '--outdir', dest='out_dir', default=cfg.out_dir)
     parser.add_argument('-p', '--proxy', dest='proxy', action='store_true', default=cfg.proxy)
-    parser.add_argument('-n', '--threadnum', default=cfg.th_num)
+    parser.add_argument('-n', '--threadnum', default=cfg.threadnum)
     args = parser.parse_args()
     return args
 
@@ -54,7 +58,7 @@ def parse_args(cfg, prog):
 def init_args_config(prog):
     cfg = Config()
     args = parse_args(cfg, prog)
-    if args.config != 'config.ini':
+    if args.config != 'miniaxel.ini':
         cfg = Config(config=args.config)
         args = parse_args(cfg, prog)
     log = _get_logger(logfile=cfg.log_file, level=cfg.log_level)
