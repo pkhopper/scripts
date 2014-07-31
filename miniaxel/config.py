@@ -20,6 +20,8 @@ class Config:
             cfg.read(pjoin(_script_path(__file__), config))
         self.out_dir = cfg.get('default', 'out_dir')
         self.retrans = cfg.getboolean('default', 'retrans')
+        self.tmin = cfg.getint('default', 'tmin')
+        self.tmax = cfg.getint('default', 'tmax')
         self.threadnum = cfg.getint('default', 'threadnum')
         self.log_level = cfg.get('default', 'log_level')
         self.log_file = cfg.get('default', 'log_file')

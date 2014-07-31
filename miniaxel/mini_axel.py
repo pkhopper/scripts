@@ -12,7 +12,6 @@ from socket import timeout as _socket_timeout
 from vavava.httputil import HttpUtil, TIMEOUT, DEBUG_LVL, HttpDownloadClipHandler as HttpClipHandler
 from vavava import util
 from vavava import threadutil
-from vavava.threadutil import WorkShop, WorkBase
 import config
 
 util.set_default_utf8()
@@ -119,16 +118,18 @@ class DownloadUrl:
             self.progress_bar.display(force)
 
     def cleanUp(self):
-            if self.progress_bar:
-                self.progress_bar.display(force=True)
-            if self.history_file:
-                self.history_file.clean()
+        if self.fp and self.fp.closed:
+            self.fp.close()
+        if self.progress_bar:
+            self.progress_bar.display(force=True)
+        if self.history_file:
+            self.history_file.clean()
 
-    class HttpDownloadWork(WorkBase):
+    class HttpDownloadWork(threadutil.WorkBase):
 
         def __init__(self, url, fp, range=None, headers=None,
                      proxy=None, mutex=None, parent=None):
-            WorkBase.__init__(self)
+            threadutil.WorkBase.__init__(self)
             self.url = url
             self.fp = fp
             self.range = range
@@ -187,16 +188,21 @@ class DownloadUrl:
                 _sleep(1)
 
 
-class MiniAxel1(WorkShop, threadutil.ThreadBase):
+class MiniAxel1(threadutil.WorkShop, threadutil.ThreadBase):
 
-    def __init__(self, bar=False, retrans=False, debug_lvl=DEBUG_LVL, log=None):
-        WorkShop.__init__(self, tmin=10, tmax=20, log=log)
+    def __init__(self, tmin=10, tmax=20, bar=True, retrans=False,
+                 debug_lvl=DEBUG_LVL, log=None):
+        threadutil.WorkShop.__init__(self, tmin=tmin, tmax=tmax, log=log)
         threadutil.ThreadBase.__init__(self, log=log)
+        self.bar = bar
+        self.retrans = retrans
         self.url_works_qu = Queue.Queue()
         self.urls = []
 
     def addUrl(self, url, out_name, headers=None, n=5):
-        self.url_works_qu.put(DownloadUrl(url, out_name=out_name, headers=headers, n=n))
+        dlurl = DownloadUrl(url, out_name=out_name, headers=headers,
+                            n=n, retrans=self.retrans, bar=self.bar)
+        self.url_works_qu.put(dlurl)
 
     def __loop(self):
 
@@ -222,7 +228,8 @@ class MiniAxel1(WorkShop, threadutil.ThreadBase):
 
             duration = _time() - start_at
             if duration < 1:
-                _sleep(duration)
+                # self.log.debug('[mini] duration = %f', duration)
+                _sleep(1)
 
     def run(self):
         self.log.debug('== axel start serving')
@@ -362,7 +369,7 @@ class HistoryFile:
 
 def main(argv):
     args, cfg, log = config.init_args_config(argv)
-    axel = MiniAxel1(bar=True, retrans=True, log=log)
+    axel = MiniAxel1(tmin=cfg.tmin, tmax=cfg.tmax, bar=True, retrans=True, log=log)
     try:
         axel.start()
         for url in args.urls:
@@ -398,26 +405,8 @@ def find_name(url):
     return u1[u1.rfind('/')+1:]
 
 
-# def test():
-#     log = util.get_logger()
-#     url = r'http://cdn.mysql.com/Downloads/Connector-J/mysql-connector-java-gpl-5.1.31.msi'
-#     axel = MiniAxel1(bar=True, retrans=True, log=log)
-#     try:
-#         axel.start()
-#         axel.addUrl(url, out_name=find_name(url), n=3)
-#     except KeyboardInterrupt as e:
-#         pass
-#     except Exception as e:
-#         log.exception(e)
-#         raise
-#     finally:
-#         axel.setToStop()
-#         axel.join()
-
-
 if __name__ == "__main__":
     try:
-        # print find_name('asdfasdf/asdf/1234/?asdfa')
         main(sys.argv)
     except KeyboardInterrupt as e:
         print 'stop by user'
