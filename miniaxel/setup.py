@@ -3,7 +3,7 @@
 
 from setuptools import setup, find_packages
 
-PACKAGE = "mini_axel"
+PACKAGE = "miniaxel"
 NAME = "miniaxel"
 DESCRIPTION = "tools"
 AUTHOR = "vavava"

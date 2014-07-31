@@ -5,6 +5,7 @@ import os
 import sys
 import urllib2
 import Queue
+from StringIO import StringIO
 from time import time as _time, sleep as _sleep
 from threading import Event as _Event
 from threading import Lock as _Lock
@@ -21,10 +22,10 @@ pabspath = os.path.abspath
 
 class DownloadUrl:
 
-    def __init__(self, url, out_name, n=1, proxy=None, bar=False, retrans=False,
+    def __init__(self, url, out, n=1, proxy=None, bar=False, retrans=False,
                  headers=None, timeout=TIMEOUT, log=None):
         self.url = url
-        self.out_name = out_name
+        self.out = out
         self.n = n
         self.proxy = proxy
         self.progress_bar = None
@@ -32,29 +33,36 @@ class DownloadUrl:
             self.progress_bar = ProgressBar()
         self.retransmission = retrans
         if retrans:
-            self.history_file = HistoryFile()
+            self.__history_file = HistoryFile()
         else:
-            self.history_file = None
+            self.__history_file = None
         self.headers = headers
         self.timeout = timeout
         self.log = log
-        self.finish = False
+        self.__subworks = []
         self.__err_ev = _Event()
-        self.fp = None
-        self.mutex = _Lock()
+        self.__err_ev.clear()
+        self.__initialised_ev = _Event()
+        self.__initialised_ev.clear()
+
+        self.__fp = None
+        self.__file_mutex = _Lock()
+        self.__mutex = _Lock()
 
     def __get_data_size(self, url):
         info = HttpUtil().head(url)
         if info.getheader('Accept-Ranges') == 'bytes':
             return int(info.getheader('Content-Length'))
 
-    def getWorks(self):
+    def getSubWorks(self):
+        if self.__initialised_ev.is_set():
+            raise ValueError('can not reinitialise')
         cur_size = 0
         size = self.__get_data_size(self.url)
         clips = self.__div_file(size, self.n)
 
         if size and self.retransmission:
-            clips, cur_size = self.history_file.mk_clips(self.out_name, clips, size)
+            clips, cur_size = self.__history_file.mk_clips(self.out, clips, size)
 
         # can not retransmission
         if clips is None or size is None or size == 0:
@@ -64,19 +72,21 @@ class DownloadUrl:
         if self.progress_bar:
             self.progress_bar.reset(total_size=size, cur_size=cur_size)
 
-        if os.path.exists(self.out_name):
-            self.fp = open(self.out_name, 'rb+')
+        if isinstance(self.out, file) or isinstance(self.out, StringIO):
+            self.__fp = self.out
+        elif os.path.exists(self.out):
+            self.__fp = open(self.out, 'rb+')
         else:
-            self.fp = open(self.out_name, 'wb')
+            self.__fp = open(self.out, 'wb')
 
-        self.subworks = []
+        self.__subworks = []
         for clip in clips:
-            work = DownloadUrl.HttpDownloadWork(url=self.url, fp=self.fp, range=clip,
-                                                mutex=self.mutex, parent=self)
-            self.subworks.append(work)
+            work = DownloadUrl.HttpDownloadWork(url=self.url, fp=self.__fp, range=clip,
+                                                file_mutex=self.__file_mutex, parent=self)
+            self.__subworks.append(work)
 
-        self.__err_ev.clear()
-        return self.subworks
+        self.__initialised_ev.set()
+        return self.__subworks
 
     def __div_file(self, size, n):
         minsize = 1024
@@ -88,6 +98,18 @@ class DownloadUrl:
         clips.append(((n-1)*clip_size, size-1))
         return clips
 
+    def isInitialised(self):
+        return self.__initialised_ev.isSet()
+
+    def isArchived(self):
+        if not self.isInitialised():
+            return False
+        if not self.isErrorHappen():
+            for work in self.__subworks:
+                if work.isWorking():
+                    return False
+        return True
+
     def setError(self):
         self.__err_ev.set()
 
@@ -95,45 +117,44 @@ class DownloadUrl:
         return self.__err_ev.isSet()
 
     def terminate(self):
-        for work in self.subworks:
+        for work in self.__subworks:
             work.terminateWork()
-
-    def isArchived(self):
-        if not self.isErrorHappen():
-            for work in self.subworks:
-                if work.isWorking():
-                    return False
-        return True
 
     def update(self, offset, size):
         if self.progress_bar:
             self.progress_bar.update(size)
-        if self.history_file:
-            self.history_file.update(offset, size=size)
+        if self.__history_file:
+            self.__history_file.update(offset, size=size)
 
     def display(self, force=False):
         if self.progress_bar:
             self.progress_bar.display(force)
 
     def cleanUp(self):
-        if self.fp and self.fp.closed:
-            self.fp.close()
         if self.progress_bar:
             self.progress_bar.display(force=True)
-        if self.history_file:
-            self.history_file.clean()
+        if self.__history_file:
+            self.__history_file.clean()
+        elif not self.isArchived():
+            is_external_file = isinstance(self.out, StringIO) or isinstance(self.out, file)
+            if not is_external_file:
+                if os.path.exists(self.out):
+                    if self.__fp and self.__fp.closed:
+                        self.__fp.close()
+                    os.remove(self.out)
+
 
     class HttpDownloadWork(threadutil.WorkBase):
 
         def __init__(self, url, fp, range=None, headers=None,
-                     proxy=None, mutex=None, parent=None):
+                     proxy=None, file_mutex=None, parent=None):
             threadutil.WorkBase.__init__(self)
             self.url = url
             self.fp = fp
             self.range = range
             self.headers = headers
             self.proxy = proxy
-            self.mutex = mutex
+            self.file_mutex = file_mutex
             self.parent = parent
             self.dl_handle = None
             self.__terminated = _Event()
@@ -161,19 +182,21 @@ class DownloadUrl:
             callback = None
             if self.parent:
                 callback = self.parent.update
-            self.dl_handle = HttpClipHandler(fp=self.fp, range=self.range, mutex=self.mutex,
+            self.dl_handle = HttpClipHandler(fp=self.fp, range=self.range, file_mutex=self.file_mutex,
                                              callback=callback, log=log)
             self.http = HttpUtil(timeout=6, proxy=self.proxy)
             while not this_thread.isSetToStop() and not self.isSetToTerminateWork():
                 try:
                     if self.dl_handle.range:
                         self.http.add_header('Range', 'bytes=%s-%s' % self.dl_handle.range)
+                    else:
+                        log.debug('[HttpDownloadWork] this is a unknown size file')
                     self.http.fetch(self.url, handler=self.dl_handle, headers=self.headers)
                     return
                 except _socket_timeout:
-                    log.debug('timeout  %s', self.url)
+                    log.debug('[HttpDownloadWork] timeout  %s', self.url)
                 except urllib2.URLError as e:
-                    log.debug('Network not work :(')
+                    log.debug('[HttpDownloadWork] Network not work :(')
                 except:
                     if self.parent:
                         self.parent.setError()
@@ -186,42 +209,47 @@ class DownloadUrl:
                 _sleep(1)
 
 
-class MiniAxelWorkShop(threadutil.WorkShop, threadutil.ThreadBase):
+class MiniAxelWorkShop(threadutil.ThreadBase):
 
     def __init__(self, tmin=10, tmax=20, bar=True, retrans=False,
                  debug_lvl=DEBUG_LVL, log=None):
-        threadutil.WorkShop.__init__(self, tmin=tmin, tmax=tmax, log=log)
         threadutil.ThreadBase.__init__(self, log=log)
         self.bar = bar
         self.retrans = retrans
-        self.url_works_qu = Queue.Queue()
-        self.url_works = []
+        self.__url_work_buffer = Queue.Queue()
+        self.__url_works = []
+        self.__ws = threadutil.WorkShop(tmin=tmin, tmax=tmax, log=log)
 
-    def addUrl(self, url, out_name, headers=None, n=5):
-        urlwk = DownloadUrl(url, out_name=out_name, headers=headers,
+    def addUrl(self, url, out, headers=None, n=5):
+        urlwk = DownloadUrl(url, out=out, headers=headers,
                             n=n, retrans=self.retrans, bar=self.bar)
-        self.url_works_qu.put(urlwk)
+        self.__url_work_buffer.put(urlwk)
+
+    def addUrlWorks(self, works):
+        for wk in works:
+            assert isinstance(wk, DownloadUrl)
+            self.__url_work_buffer.put(wk)
 
     def __loop(self):
 
         while not self.isSetToStop():
             start_at = _time()
 
-            if not self.url_works_qu.empty():
-                urlwk = self.url_works_qu.get()
-                self.addWorks(urlwk.getWorks())
-                self.url_works.append(urlwk)
+            if not self.__url_work_buffer.empty():
+                urlwk = self.__url_work_buffer.get()
+                self.__ws.addWorks(urlwk.getSubWorks())
+                self.__url_works.append(urlwk)
                 # self.log.debug('[ws] get a work: %s', urlwk.url)
 
-            for i, urlwk in enumerate(self.url_works):
+            for i, urlwk in enumerate(self.__url_works):
                 urlwk.display()
                 if urlwk.isErrorHappen():
                     self.log.debug('[axel] work err: %s', urlwk.url)
                     urlwk.terminate()
                 if urlwk.isArchived() or urlwk.isErrorHappen():
                     urlwk.cleanUp()
-                    self.log.debug('[axel] work cleanup: %s', urlwk.url)
-                    del self.url_works[i]
+                    self.log.debug('[axel] work done: %s', urlwk.url)
+                    del self.__url_works[i]
                     break
 
             duration = _time() - start_at
@@ -231,16 +259,16 @@ class MiniAxelWorkShop(threadutil.WorkShop, threadutil.ThreadBase):
     def run(self):
         self.log.debug('[axel] start serving')
         try:
-            self.serve()
+            self.__ws.serve()
             self.__loop()
         except:
             raise
         finally:
-            for urlwk in self.url_works:
+            for urlwk in self.__url_works:
                 urlwk.terminate()
                 urlwk.cleanUp()
-            self.setShopClose()
-            self.waitShopClose()
+            self.__ws.setShopClose()
+            self.__ws.waitShopClose()
         self.log.debug('[axel] stop serving')
 
 
