@@ -6,15 +6,18 @@ import re
 import time
 import urllib
 import urllib2
+import Queue
+from sys import maxint as _maxint
+from StringIO import StringIO
 from time import sleep
+from socket import timeout as _socket_timeout
 
-from vavava.httputil import HttpUtil
-from vavava.httputil import MiniAxel
-from vavava.httputil import HttpDownloadClipHandler
-from vavava import util
-from vavava.threadutil import ThreadBase, ThreadManager
+from vavava import util as _util
+from vavava.threadutil import ThreadBase
+from vavava.httputil import HttpUtil, HttpDownloadClipHandler
+from miniaxel.miniaxel import DownloadUrl, MiniAxelWorkShop
 
-util.set_default_utf8()
+_util.set_default_utf8()
 CHARSET = "utf-8"
 pjoin = os.path.join
 pdirname = os.path.dirname
@@ -22,14 +25,14 @@ pabspath = os.path.abspath
 
 
 class Config:
-    def __init__(self, config="config.ini"):
-        # script_dir = util.script_path(__file__)
+    def __init__(self, config="dllive.ini"):
+        # script_dir = _util.script_path(__file__)
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
         if os.path.exists(config):
             cfg.read(pabspath(config))
         else:
-            cfg.read(pjoin(util.script_path(__file__), config))
+            cfg.read(pjoin(_util.script_path(__file__), config))
         self.out_dir = cfg.get('default', 'out_dir')
         self.channel = cfg.get('default', 'channel')
         # self.duration = cfg.getint('default', 'duration')
@@ -57,147 +60,120 @@ config = None
 log = None
 
 
-def get_channel_url(name, addr_file):
-    urls = []
-    with open(addr_file, 'r') as fp:
-        channels = fp.readlines()
-    for channel in channels:
-        info = channel.split('#')
-        if len(info) < 2:
-            continue
-        channel_name, url = info[0], info[1]
-        if channel_name.lower().find(name) > 0:
-            urls.append(url)
-    return urls
-
-
-def filter_host(url):
-    if url.find('ifeng.com') > 0:
-        return re.match('(^http[s]?://[^/?]*/)', url).group(0)
-    else:
-        return re.match('(^http[s]?://.*/)', url).group(0)
-
-
-class M3u8:
+class M3u8Stream(ThreadBase):
     TMP_PATH = '.dllive'
 
-    def __init__(self, http, log):
-        self.http = http
-        self.log = log
-        self.old_urls = dict()
-        self.mgr = None
-        self.single_dl_handle = None
+    def __init__(self, log=None):
+        ThreadBase.__init__(self, log=log)
+        self.__http = HttpUtil(timeout=10)
+        self.__old_urls = dict()
+        self.__urlworks_queue = Queue.Queue()
+        self.__axel = MiniAxelWorkShop(tmin=10, tmax=20, log=log)
 
-    def terminate_dl(self, timeout=None):
-        if self.mgr:
-            self.mgr.stopAll()
-            self.mgr.joinAll(timeout=timeout)
-        if self.single_dl_handle:
-            self.single_dl_handle.stop()
-            self.single_dl_handle.join(timeout=timeout)
+    def start_dl(self, url, fp, proxy=None):
+        if proxy:
+            self.__http.set_proxy({'http': proxy})
+        self.index_url = url
+        self.__ostream = fp
+        self.tmp_path = pjoin(config.out_dir, M3u8Stream.TMP_PATH)
+        _util.assure_path(self.tmp_path)
+        self.start()
 
-    def dl_stream(self, url, url_base, fp):
-        start_time = time.time()
-        total_server = 0
-        # stop_time = duration + start_time
-        while True:
-            before = time.time()
-            count, total, targetduration = self.__dl_stream(url, url_base, output_fp=fp)
-            after = time.time()
-            curr_local = after - before   # time_transfer
-            curr_server = count * targetduration
-            curr_buffered = curr_server - curr_local
-            total_server += curr_server
-            total_local = after - start_time
-            total_buffered = total_server - total_local
-            # T=total;C=current;
-            self.log.debug('CURR:%.2f/%.2f(%.2f);TOTAL:%.2f/%.2f(%.2f);DURATION:%d;COUNT:%d',
-                      curr_local, curr_server, curr_buffered, total_local,
-                      total_server, total_buffered, targetduration, count)
-            # if duration > 0 and stop_time - after < max(curr_buffered, 0.01):
-            #     log.debug(r"===> time's up.")
-            #     break
-            need_wait = curr_buffered > targetduration and total_buffered > targetduration
-            if count == 0 or need_wait:
-                wait = min(10, targetduration)
-                self.log.debug('sleep(%d)', wait)
-                sleep(wait)
-
-    def __get_curr_index(self, url, url_base=None):
-        lines = []
-        targetduration = 2
-        if url_base is None:
-            url_base = re.match('(^http[s]?://.*/)', url).group(0)
-        m3u8 = self.http.get(url)
-        urls = m3u8.splitlines(False)
-        for url in urls:
-            if url.strip() == '':
-                continue
-            elif not url.startswith('#'):
-                self.log.debug('m3u8InerUrl ==> %s', url)
-                if not url.startswith('http'):
-                    url = urllib.basejoin(url_base, url)
-                if url.endswith('.m3u8'):
-                    return self.__get_curr_index(url, url_base)
-                lines.append(url)
-            elif url.lower().find('targetduration') > 0:
-                targetduration = int(url.split(':')[1])
-                self.log.debug('targetduration=%d', targetduration)
-        return lines, targetduration
-
-    def __dl_stream(self, url, url_base, output_fp):
-        self.mgr = ThreadManager()
-        name_index = count = 0
-        clips = []
-        tmp_path = pjoin(config.out_dir, M3u8.TMP_PATH)
-        util.assure_path(tmp_path)
-        urls, targetduration = self.__get_curr_index(url, url_base)
-        for url in urls:
-            if url not in self.old_urls:
-                self.log.debug('Download m3u8 ts: %s', url)
-                name_index += 1
-                clip_file = pjoin(tmp_path, '%02d_%s.tmp' % (name_index, hash(url)))
-                clips.append((clip_file, url))
-                thread = M3u8.__DownloadThread(url, filename=clip_file, log=self.log)
-                self.mgr.addThreads([thread])
-                count += 1
+    def run(self):
         try:
-            self.mgr.startAll()
-            self.mgr.joinAll()
-
-            for clip_file, clip_url in clips:
-                if not os.path.exists(clip_file):
-                    self.log.warn('clip file not exists: %s', clip_file)
-                    continue
-                self.log.debug('==> write: %s', clip_file)
-                with open(clip_file, 'rb') as fp:
-                    output_fp.write(fp.read())
-                os.remove(clip_file)
-                self.old_urls[clip_url] = True
+            self.__axel.start()
+            self.__loop()
         except:
-            self.mgr.stopAll()
-            self.mgr.joinAll()
-            for clip_file, clip_url in clips:
-                if os.path.exists(clip_file):
-                    os.remove(clip_file)
             raise
-        return count, len(urls), targetduration
+        finally:
+            self.log.debug('[M3u8Stream] stop')
+            if not self.__urlworks_queue.empty():
+                wk = self.__urlworks_queue.get()
+                wk.cleanUp()
+            self.__axel.setToStop()
+            self.__axel.join()
 
-    class __DownloadThread(ThreadBase):
+    def __loop(self):
+        last_index_at = 0
+        curr_urlwk = None
+        stream_len = 0
+        buff_stream_len = 0
+        targetduration = 2
+        while not self.isSetToStop():
+            start_at = time.time()
+            if last_index_at + 10 < start_at:
+                self.log.debug('[M3u8Stream] try get new clips')
+                last_index_at = start_at
+                urls, targetduration = self.__get_curr_index()
+                for url in urls:
+                    if url not in self.__old_urls:
+                        urlwork = DownloadUrl(url, out=StringIO(), n=3, log=self.log)
+                        self.__urlworks_queue.put(urlwork)
+                        self.__old_urls[url] = True
+                        stream_len += targetduration
+                        self.log.debug('[M3u8Stream] add a urlwork, %s', url)
 
-        def __init__(self, url, filename, log):
-            ThreadBase.__init__(self, log=log)
-            self.url = url
-            self.filename = filename
-            self.miniaxel = MiniAxel()
+            if not curr_urlwk and not self.__urlworks_queue.empty():
+                curr_urlwk = self.__urlworks_queue.get()
+                self.__axel.addUrlWorks([curr_urlwk])
+                self.log.debug('[M3u8Stream] working on a new urlwork, %s', curr_urlwk.url)
 
-        def stop(self):
-            ThreadBase.stop(self)
-            self.miniaxel.terminate_dl()
+            if not curr_urlwk:
+                # self.log.debug('[M3u8Stream] idel')
+                pass
+            elif curr_urlwk.isArchived():
+                self.log.debug('[M3u8Stream] archive a urlwork, %s', curr_urlwk.url)
+                self.__ostream.write(curr_urlwk.out.read())
+                curr_urlwk.out.close()
+                curr_urlwk.cleanUp()
+                curr_urlwk = None
+                buff_stream_len += targetduration
+                self.log.info('[M3u8Stream] %d/%d', buff_stream_len, stream_len)
+            elif curr_urlwk.isErrorHappen():
+                self.log.error('[M3u8Stream] urlwork error: %s', curr_urlwk.url)
+                curr_urlwk.cleanUp()
+                curr_urlwk = None
+                raise
 
-        def run(self):
-            self.miniaxel.dl(self.url, out=self.filename, n=3)
-            self.log.debug('--> dl ok: %s', self.filename)
+            duration = time.time() - start_at
+            if duration < 1:
+                sleep(1)
+
+    def __get_curr_index(self):
+        try:
+            clips = []
+            targetduration = 2
+            url_base = M3u8Stream.host_filter(self.index_url)
+            m3u8 = self.__http.get(self.index_url)
+            urls = m3u8.splitlines(False)
+            for url in urls:
+                url = url.strip(' \n')
+                if url.strip() == '':
+                    continue
+                elif not url.startswith('#'):
+                    # self.log.debug('m3u8InerUrl ==> %s', url)
+                    if not url.startswith('http'):
+                        url = urllib.basejoin(url_base, url)
+                    if url.endswith('.m3u8'):
+                        return self.__get_curr_index()
+                    clips.append(url)
+                elif url.lower().find('targetduration') > 0:
+                    targetduration = int(url.split(':')[1])
+                    self.log.debug('targetduration=%d', targetduration)
+            return clips, targetduration
+        except urllib2.URLError:
+            self.log.debug('network not working')
+        except _socket_timeout:
+            self.log.debug('connection timeout')
+        except:
+            raise
+
+    @staticmethod
+    def host_filter(url):
+        if url.find('ifeng.com') > 0:
+            return re.match('(^http[s]?://[^/?]*/)', url).group(0)
+        else:
+            return re.match('(^http[s]?://.*/)', url).group(0)
 
 
 class ClipDownloader(ThreadBase):
@@ -209,10 +185,11 @@ class ClipDownloader(ThreadBase):
         self.dl_handler = None
 
     def terminate_dl(self):
-        ThreadBase.stop(self)
         if self.dl_handler:
             self.dl_handler.stop_dl()
             self.dl_handler.wait_stop()
+        self.setToStop()
+        self.join()
 
     def run(self):
         try:
@@ -224,66 +201,78 @@ class ClipDownloader(ThreadBase):
             raise
 
 
-class DownloadLiveStream:
+class DownloadLiveStream(ThreadBase):
 
     def __init__(self, log):
-        self.log = log
+        ThreadBase.__init__(self, log=log)
+        self.outfile = None
+        self.duration = None
+        self.__m3u8 = M3u8Stream(log=log)
+        self.__dl_handler = None
 
-    def recode(self, url, out_dir, duration=None, proxy=None):
+    def __prepair(self, url, out_dir, duration, proxy):
         assert duration is None or duration > 0
-        url = url.strip(' \n')
-        url_base = filter_host(url)
-        http = HttpUtil(timeout=10)
-        if proxy:
-            http.set_proxy({'http': proxy})
-        self.log.info("|=> begin: %s", url)
-        if duration:
-            self.log.info("|duration: %s", duration)
-        util.assure_path(out_dir)
-        outfile = pjoin(out_dir, util.get_time_string() + ".ts")
-        self.log.info("|=> output: %s", outfile)
-        start_at = time.time()
-        with open(outfile, 'wb') as fp:
-            self.__recode(url, url_base=url_base, fp=fp, duration=duration, http=http)
-        self.log.info("|=> end: total=%.2fs, out=%s", time.time() - start_at, outfile)
+        if self.duration and isinstance(duration, int):
+            self.duration = int(duration)
+        self.out_dir = out_dir
+        self.outfile = pjoin(out_dir, _util.get_time_string() + ".ts")
+        self.url = url
+        self.proxy = proxy
 
-    def __recode(self, url, url_base, fp, duration, http):
+    def recode_in_this_thread(self, url, out_dir, duration=None, proxy=None):
+        self.__prepair(url, out_dir, duration, proxy)
+        self.__run_in_caller_thread = True
+        self.run()
+
+    def start_recode(self, url, out_dir, duration=None, proxy=None):
+        self.__prepair(url, out_dir, duration, proxy)
+        self.start()
+
+    def run(self):
+        self.log.info("|=> begin: %s", self.url)
+        if self.duration:
+            self.log.info("|duration: %d", self.duration)
+        _util.assure_path(self.out_dir)
+        self.log.info("|=> output: %s", self.outfile)
+        start_at = time.time()
+        try:
+            with open(self.outfile, 'wb') as fp:
+                self.__loop(fp=fp)
+        except:
+            pass
+        finally:
+            if self.__dl_handler:
+                self.__dl_handler.terminate_dl()
+            if self.__m3u8.isAlive():
+                self.__m3u8.setToStop()
+            self.__m3u8.join()
+        self.log.info("|=> end: total=%.2fs, out=%s", time.time() - start_at, self.outfile)
+
+    def __loop(self, fp):
+        if self.url.find('m3u8') > 0 or DownloadLiveStream.__is_url_file(self.url):
+            self.__m3u8.start_dl(url=self.url, fp=fp, proxy=self.proxy)
+        else:
+            self.__dl_handler = ClipDownloader(self.url, fp)
+            self.__dl_handler.start()
         start_at = time.time()
         stop_at = 0
-        if duration:
-            stop_at = start_at + duration
-        m3u8 =  None
-        dl_handler = None
-        while True:
-            if duration and time.time() >= stop_at:
-                if dl_handler:
-                    dl_handler.terminate_dl()
-                if m3u8:
-                    m3u8.terminate_dl(3)
+        if self.duration:
+            stop_at = start_at + self.duration
+        while not self.isSetToStop() or self.__run_in_caller_thread:
+            loop_start_at = time.time()
+            if self.duration and loop_start_at >= stop_at:
+                self.log.info("[DownloadLiveStream] time's up")
                 break
-            try:
-                if url.find('m3u8') > 0 or self.__is_url_file(url):
-                    self.log.debug('dl_stream=>m3u8: %s', url)
-                    m3u8 = M3u8(http, log=self.log)
-                    m3u8.dl_stream(url, url_base, fp)
-                    return
-                else:
-                    self.log.debug('dl_stream=>single ts file: %s', url)
-                    dl_handler = ClipDownloader(url, fp)
-                    http.fetch(url, dl_handler)
-                    return
-            except urllib2.URLError as e:
-                self.log.exception(e)
-                self.log.warn('===> offline, retry in one seconds')
-                time.sleep(1)
-            except:
-                if dl_handler:
-                    dl_handler.terminate_dl()
-                if m3u8:
-                    m3u8.terminate_dl(3)
-                raise
+            loop_duration = time.time() - loop_start_at
+            if loop_duration < 1:
+                sleep(1)
 
-    def __is_url_file(self, url):
+    def stopRecode(self):
+        if self.isAlive():
+            self.setToStop()
+
+    @staticmethod
+    def __is_url_file(url):
         import urllib2
         req = urllib2.Request(url)
         resp = urllib2.urlopen(req)
@@ -308,14 +297,21 @@ def interact(duration, out_dir, address_file, proxy=None):
         channel_list.append(k)
         print '[%2d] %s  %s'%(index, k, v)
     channel_id = int(raw_input('id? ')) - 1
-    DownloadLiveStream().recode(sub_addr[channel_list[channel_id]], duration, out_dir)
-
+    dls = DownloadLiveStream(log=log)
+    try:
+        dls.start_recode(url=sub_addr[channel_list[channel_id]],
+                         out_dir=out_dir, duration=duration, proxy=proxy)
+    except:
+        raise
+    finally:
+        dls.setToStop()
+        dls.join()
 
 def parse_args(config):
     usage = """./dllive [-i|l][-c config][-o out_put_path][-f favorite][-d duration]"""
     import argparse
     parser=argparse.ArgumentParser(usage=usage, description='download live stream', version='0.1')
-    parser.add_argument('-c', '--config', default='config.ini')
+    parser.add_argument('-c', '--config', default='dllive.ini')
     parser.add_argument('-d', '--duration', type=float)
     parser.add_argument('-o', '--out-path', dest='out_dir', default=config.out_dir)
     parser.add_argument('-p', '--proxy', dest='proxy', action='store_const', const=True, help='http/https proxy')
@@ -331,10 +327,10 @@ def parse_args(config):
 def init_args_config():
     config = Config()
     args = parse_args(config)
-    if args.config != 'config.ini':
+    if args.config != 'dllive.ini':
         config = Config(config=args.config)
         args = parse_args(config)
-    log = util.get_logger(logfile=config.log, level=config.log_level)
+    log = _util.get_logger(logfile=config.log, level=config.log_level)
     return args, config, log
 
 
@@ -352,7 +348,7 @@ def main():
                  address_file=config.address_file, proxy=proxy)
         return
     elif args.channellist:
-        script_path = util.script_path(__file__)
+        script_path = _util.script_path(__file__)
         os.system('python %s/xbmc_5ivdo.py -t 直播 > %s'%(
             script_path, config.address_file))
         return
@@ -365,8 +361,16 @@ def main():
         live_url = args.url
 
     dls = DownloadLiveStream(log=log)
-    dls.recode(url=live_url, out_dir=args.out_dir, duration=args.duration, proxy=proxy)
-
+    try:
+        dls.recode_in_this_thread(url=live_url, out_dir=args.out_dir,
+                         duration=args.duration, proxy=proxy)
+    except Exception as e:
+        log.exception(e)
+        raise
+    # finally:
+    #     if not dls.isAlive():
+    #         dls.stopRecode()
+    #         dls.join()
 
 if __name__ == "__main__":
     try:
