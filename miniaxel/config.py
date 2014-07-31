@@ -84,7 +84,7 @@ def test_miniaxel(self):
     ]
     for argv in test_cases:
         try:
-            from mini_axel import main as _main
+            from miniaxel import main as _main
             _main(argv)
             with open(out_file, 'rb') as fp:
                 md5 = util.md5_for_file(fp)

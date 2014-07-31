@@ -6,7 +6,7 @@ import unittest
 import os
 
 from vavava import util
-import mini_axel
+import miniaxel
 
 sys.path.insert(0, '.')
 
@@ -31,7 +31,7 @@ class Test_miniaxel(unittest.TestCase):
         ]
         for argv in test_cases:
             try:
-                mini_axel.main(argv)
+                miniaxel.main(argv)
                 with open(out_file, 'rb') as fp:
                     md5 = util.md5_for_file(fp)
                 self.assertTrue(Test_miniaxel.orig_md5 == md5)

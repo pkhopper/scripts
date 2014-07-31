@@ -12,7 +12,6 @@ from socket import timeout as _socket_timeout
 from vavava.httputil import HttpUtil, TIMEOUT, DEBUG_LVL, HttpDownloadClipHandler as HttpClipHandler
 from vavava import util
 from vavava import threadutil
-import config
 
 util.set_default_utf8()
 CHARSET = "utf-8"
@@ -153,7 +152,7 @@ class DownloadUrl:
                 self.dl_handle.stop_dl()
 
         def work(self, this_thread, log):
-            log.debug('[wk] start working, %s', self.url)
+            # log.debug('[wk] start working, %s', self.url)
             self.__terminated.clear()
             self.__working = True
             self.__work(this_thread, log)
@@ -188,7 +187,7 @@ class DownloadUrl:
                 _sleep(1)
 
 
-class MiniAxel1(threadutil.WorkShop, threadutil.ThreadBase):
+class MiniAxelWorkShop(threadutil.WorkShop, threadutil.ThreadBase):
 
     def __init__(self, tmin=10, tmax=20, bar=True, retrans=False,
                  debug_lvl=DEBUG_LVL, log=None):
@@ -197,12 +196,12 @@ class MiniAxel1(threadutil.WorkShop, threadutil.ThreadBase):
         self.bar = bar
         self.retrans = retrans
         self.url_works_qu = Queue.Queue()
-        self.urls = []
+        self.url_works = []
 
     def addUrl(self, url, out_name, headers=None, n=5):
-        dlurl = DownloadUrl(url, out_name=out_name, headers=headers,
+        urlwk = DownloadUrl(url, out_name=out_name, headers=headers,
                             n=n, retrans=self.retrans, bar=self.bar)
-        self.url_works_qu.put(dlurl)
+        self.url_works_qu.put(urlwk)
 
     def __loop(self):
 
@@ -212,18 +211,18 @@ class MiniAxel1(threadutil.WorkShop, threadutil.ThreadBase):
             if not self.url_works_qu.empty():
                 urlwk = self.url_works_qu.get()
                 self.addWorks(urlwk.getWorks())
-                self.urls.append(urlwk)
+                self.url_works.append(urlwk)
                 self.log.debug('get a work: %s', urlwk.url)
 
-            for i, url in enumerate(self.urls):
-                url.display()
-                if url.isErrorHappen():
-                    self.log.debug('err work: %s', url.url)
-                    url.terminate()
-                if url.isAchived() or url.isErrorHappen():
-                    url.cleanUp()
-                    self.log.debug('cleanup a work: %s', url.url)
-                    del self.urls[i]
+            for i, urlwk in enumerate(self.url_works):
+                urlwk.display()
+                if urlwk.isErrorHappen():
+                    self.log.debug('err work: %s', urlwk.url)
+                    urlwk.terminate()
+                if urlwk.isAchived() or urlwk.isErrorHappen():
+                    urlwk.cleanUp()
+                    self.log.debug('cleanup a work: %s', urlwk.url)
+                    del self.url_works[i]
                     break
 
             duration = _time() - start_at
@@ -239,10 +238,9 @@ class MiniAxel1(threadutil.WorkShop, threadutil.ThreadBase):
         except:
             raise
         finally:
-            for url in self.urls:
-                if url.isErrorHappen():
-                    url.terminate()
-                url.cleanUp()
+            for urlwk in self.url_works:
+                urlwk.terminate()
+                urlwk.cleanUp()
             self.setShopClose()
             self.waitShopClose()
         self.log.debug('== axel stop serving')
@@ -303,6 +301,7 @@ class HistoryFile:
 
     def __init__(self):
         self.mutex = _Lock()
+        self.txt = None
 
     def mk_clips(self, target_file, clips, size):
         """ return clips, current_size, is_retransmission
@@ -349,8 +348,9 @@ class HistoryFile:
 
     def clean(self):
         with self.mutex:
-            if os.path.exists(self.txt):
-                os.remove(self.txt)
+            if self.txt:
+                if os.path.exists(self.txt):
+                    os.remove(self.txt)
 
     def update_file(self, force=False):
         str = ''
@@ -365,49 +365,3 @@ class HistoryFile:
                     assert a <= (b + 1)
         with open(self.txt, 'w') as fp:
             fp.write(str)
-
-
-def main(argv):
-    args, cfg, log = config.init_args_config(argv)
-    axel = MiniAxel1(tmin=cfg.tmin, tmax=cfg.tmax, bar=True, retrans=True, log=log)
-    try:
-        axel.start()
-        for url in args.urls:
-            log.info('add %s', url)
-            name = pjoin(cfg.out_dir, find_name(url))
-            axel.addUrl(url, out_name=name, n=cfg.threadnum)
-        while True:
-            cmd = raw_input('>>')
-            if cmd in ('q'):
-                break
-            elif cmd in('test'):
-                url = r'http://cdn.mysql.com/Downloads/Connector-J/mysql-connector-java-gpl-5.1.31.msi'
-                name = pjoin(cfg.out_dir, find_name(url))
-                axel.addUrl(url, out_name=name, n=cfg.threadnum)
-            else:
-                url = cmd
-                name = pjoin(cfg.out_dir, find_name(url))
-                axel.addUrl(url, out_name=name, n=cfg.threadnum)
-    except KeyboardInterrupt as e:
-        pass
-    except Exception as e:
-        log.exception(e)
-        raise
-    finally:
-        axel.setToStop()
-        axel.join()
-
-
-def find_name(url):
-    u1 = url.split('?')[0]
-    if u1.rfind('/') == len(u1) -1:
-        u1 = u1[:-1]
-    return u1[u1.rfind('/')+1:]
-
-
-if __name__ == "__main__":
-    try:
-        main(sys.argv)
-    except KeyboardInterrupt as e:
-        print 'stop by user'
-        exit(0)
