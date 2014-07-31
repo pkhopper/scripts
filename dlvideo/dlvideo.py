@@ -5,7 +5,7 @@ import os
 import sys
 import dl_helper
 from vavava import util
-from config import Config as _Config
+from config import init_args_config
 
 
 util.set_default_utf8()
@@ -41,34 +41,11 @@ def dispatch(url):
         downloader = dl_helper.Downloader(nperfile=nperfile, nthread=config.nthread, log=log)
         downloader.download(urls, title=title, out_dir=config.out_dir, ext=ext, headers=headers)
 
-def parse_args(config):
-    import argparse
-    usage = """./dlvideo [-m][-l][-c config][-o output][-f format] url ..."""
-    parser=argparse.ArgumentParser(usage=usage, description='download net video', version='0.1')
-    parser.add_argument('urls', nargs='*', help='urls')
-    # parser.add_argument('urls', nargs='+', help='urls')
-    parser.add_argument('-c', '--config', default='config.ini')
-    parser.add_argument('-o', '--odir')
-    parser.add_argument('-i', '--interact', action='store_true')
-    parser.add_argument('-l', '--play-list', dest='play_list', action='store_true')
-    parser.add_argument('-f', '--format', help='video format:super, normal',choices=['0', '1', '2', '3'])
-    args = parser.parse_args()
-    # print args
-    return args
-
-def init_args_config():
-    config = _Config()
-    args = parse_args(config=config)
-    if args.config != 'config.ini':
-        config = _Config(config=args.config)
-        args = parse_args(config=config)
-    log = util.get_logger(logfile=config.log, level=config.log_level)
-    return args, config, log
 
 def main():
     global log
     global config
-    args, config, log = init_args_config()
+    args, config, log = init_args_config(sys.argv, __file__)
     dl_helper.log = log
     log.info('{}'.format(args))
     if args.odir:

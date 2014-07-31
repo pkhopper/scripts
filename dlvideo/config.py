@@ -2,7 +2,7 @@
 # coding=utf-8
 
 import os
-from vavava.util import script_path as _script_path
+from vavava import util
 
 pjoin = os.path.join
 pdirname = os.path.dirname
@@ -10,13 +10,13 @@ pabspath = os.path.abspath
 
 
 class Config:
-    def __init__(self, config='config.ini'):
+    def __init__(self, config='dlvideo.ini', script=__file__):
         import ConfigParser
         cfg = ConfigParser.ConfigParser()
         if os.path.exists(config):
             cfg.read(pabspath(config))
         else:
-            cfg.read(pjoin(_script_path(__file__), config))
+            cfg.read(pjoin(util.script_path(script), config))
         self.out_dir = cfg.get('default', 'out_dir')
         self.format = cfg.getint('default', 'format')
         self.dl_method = cfg.get('default', 'dl_method')
@@ -46,3 +46,28 @@ class Config:
         }
         if self.log_level:
             self.log_level = lvlconvert[self.log_level.strip().lower()]
+
+
+def parse_args(config, argv):
+    import argparse
+    usage = """./dlvideo [-m][-l][-c config][-o output][-f format] url ..."""
+    parser=argparse.ArgumentParser(prog=argv, usage=usage, description='download net video', version='0.1')
+    parser.add_argument('urls', nargs='*', help='urls')
+    # parser.add_argument('urls', nargs='+', help='urls')
+    parser.add_argument('-c', '--config', default='dlvideo.ini')
+    parser.add_argument('-o', '--odir')
+    parser.add_argument('-i', '--interact', action='store_true')
+    parser.add_argument('-l', '--play-list', dest='play_list', action='store_true')
+    parser.add_argument('-f', '--format', help='0,1,2,3',choices=['0', '1', '2', '3'])
+    args = parser.parse_args()
+    # print args
+    return args
+
+def init_args_config(argv, script):
+    config = Config(script=script)
+    args = parse_args(config, argv)
+    if args.config != 'dlvideo.ini':
+        config = Config(config=args.config, script=script)
+        args = parse_args(config, argv)
+    log = util.get_logger(logfile=config.log, level=config.log_level)
+    return args, config, log
