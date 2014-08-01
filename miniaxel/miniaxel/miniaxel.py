@@ -5,12 +5,12 @@ import os
 import sys
 import urllib2
 import Queue
-from StringIO import StringIO
+from io import BytesIO
 from time import time as _time, sleep as _sleep
 from threading import Event as _Event
 from threading import Lock as _Lock
 from socket import timeout as _socket_timeout
-from vavava.httputil import HttpUtil, TIMEOUT, DEBUG_LVL, HttpDownloadClipHandler as HttpClipHandler
+from vavava.httputil import HttpUtil, TIMEOUT, DEBUG_LVL, HttpDownloader
 from vavava import util
 from vavava import threadutil
 
@@ -23,9 +23,18 @@ pabspath = os.path.abspath
 class DownloadUrl:
 
     def __init__(self, url, out, n=1, proxy=None, bar=False, retrans=False,
-                 headers=None, timeout=TIMEOUT, log=None):
+                 headers=None, archive_callback=None, timeout=TIMEOUT, log=None):
         self.url = url
         self.out = out
+
+        if isinstance(self.out, file) or isinstance(self.out, BytesIO):
+            self.__fp = self.out
+            retrans = False
+        elif os.path.exists(self.out):
+            self.__fp = open(self.out, 'rb+')
+        else:
+            self.__fp = open(self.out, 'wb')
+
         self.n = n
         self.proxy = proxy
         self.progress_bar = None
@@ -37,6 +46,7 @@ class DownloadUrl:
         else:
             self.__history_file = None
         self.headers = headers
+        self.archive_callback = archive_callback
         self.timeout = timeout
         self.log = log
         self.__subworks = []
@@ -45,7 +55,6 @@ class DownloadUrl:
         self.__initialised_ev = _Event()
         self.__initialised_ev.clear()
 
-        self.__fp = None
         self.__file_mutex = _Lock()
         self.__mutex = _Lock()
 
@@ -61,7 +70,7 @@ class DownloadUrl:
         size = self.__get_data_size(self.url)
         clips = self.__div_file(size, self.n)
 
-        if size and self.retransmission:
+        if size and self.retransmission and self.__history_file:
             clips, cur_size = self.__history_file.mk_clips(self.out, clips, size)
 
         # can not retransmission
@@ -71,13 +80,6 @@ class DownloadUrl:
 
         if self.progress_bar:
             self.progress_bar.reset(total_size=size, cur_size=cur_size)
-
-        if isinstance(self.out, file) or isinstance(self.out, StringIO):
-            self.__fp = self.out
-        elif os.path.exists(self.out):
-            self.__fp = open(self.out, 'rb+')
-        else:
-            self.__fp = open(self.out, 'wb')
 
         self.__subworks = []
         for clip in clips:
@@ -135,28 +137,32 @@ class DownloadUrl:
             self.progress_bar.display(force=True)
         if self.__history_file:
             self.__history_file.clean()
-        elif not self.isArchived():
-            is_external_file = isinstance(self.out, StringIO) or isinstance(self.out, file)
-            if not is_external_file:
-                if os.path.exists(self.out):
-                    if self.__fp and self.__fp.closed:
-                        self.__fp.close()
-                    os.remove(self.out)
+        else:
+            if not self.isArchived():
+                is_external_file = isinstance(self.out, BytesIO) or isinstance(self.out, file)
+                if not is_external_file:
+                    if os.path.exists(self.out):
+                        if self.__fp and self.__fp.closed:
+                            self.__fp.close()
+                        os.remove(self.out)
+            elif self.archive_callback:
+                self.archive_callback()
+
+
 
 
     class HttpDownloadWork(threadutil.WorkBase):
 
-        def __init__(self, url, fp, range=None, headers=None,
-                     proxy=None, file_mutex=None, parent=None):
+        def __init__(self, url, fp, range=None, proxy=None,
+                     file_mutex=None, parent=None):
             threadutil.WorkBase.__init__(self)
             self.url = url
             self.fp = fp
             self.range = range
-            self.headers = headers
             self.proxy = proxy
             self.file_mutex = file_mutex
             self.parent = parent
-            self.dl_handle = None
+            self.downloader = None
             self.__terminated = _Event()
             self.__working = True
 
@@ -168,8 +174,8 @@ class DownloadUrl:
 
         def terminateWork(self):
             self.__terminated.set()
-            if self.dl_handle:
-                self.dl_handle.stop_dl()
+            if self.downloader:
+                self.downloader.stop_dl()
 
         def work(self, this_thread, log):
             # log.debug('[wk] start working, %s', self.url)
@@ -182,30 +188,28 @@ class DownloadUrl:
             callback = None
             if self.parent:
                 callback = self.parent.update
-            self.dl_handle = HttpClipHandler(fp=self.fp, range=self.range, file_mutex=self.file_mutex,
-                                             callback=callback, log=log)
-            self.http = HttpUtil(timeout=6, proxy=self.proxy)
+            self.downloader = HttpDownloader(
+                fp=self.fp, range=self.range,
+                file_mutex=self.file_mutex, callback=callback, log=log
+            )
             while not this_thread.isSetToStop() and not self.isSetToTerminateWork():
                 try:
-                    if self.dl_handle.range:
-                        self.http.add_header('Range', 'bytes=%s-%s' % self.dl_handle.range)
-                    else:
-                        log.debug('[HttpDownloadWork] this is a unknown size file')
-                    self.http.fetch(self.url, handler=self.dl_handle, headers=self.headers)
+                    self.downloader.fetch(self.url)
                     return
                 except _socket_timeout:
                     log.debug('[HttpDownloadWork] timeout  %s', self.url)
                 except urllib2.URLError as e:
                     log.debug('[HttpDownloadWork] Network not work :(')
+                    log.exception(e)
                 except:
                     if self.parent:
                         self.parent.setError()
                     self.is_err_happen = True
                     raise
                 finally:
-                    if self.dl_handle:
-                        self.dl_handle.stop_dl()
-                        self.dl_handle.wait_stop()
+                    if self.downloader:
+                        self.downloader.stop_dl()
+                        self.downloader.wait_stop()
                 _sleep(1)
 
 
@@ -220,9 +224,9 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
         self.__url_works = []
         self.__ws = threadutil.WorkShop(tmin=tmin, tmax=tmax, log=log)
 
-    def addUrl(self, url, out, headers=None, n=5):
+    def addUrl(self, url, out, headers=None, n=5, archive_callback=None):
         urlwk = DownloadUrl(url, out=out, headers=headers,
-                            n=n, retrans=self.retrans, bar=self.bar)
+                    n=n, retrans=self.retrans, bar=self.bar, archive_callback=archive_callback)
         self.__url_work_buffer.put(urlwk)
 
     def addUrlWorks(self, works):
