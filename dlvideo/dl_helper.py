@@ -94,6 +94,7 @@ class Downloader:
             return
         self.log.info('==> dl: %s, %s', file_name, url)
         tmp_file = file_name + '!'
+        print self.dl_method
         if self.dl_method in ('mini'):
             progress_bar = httputil.ProgressBar()
             self.miniaxel = httputil.MiniAxel(progress_bar=progress_bar, retrans=True)

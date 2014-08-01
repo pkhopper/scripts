@@ -48,8 +48,8 @@ def main():
     args, config, log = init_args_config(sys.argv, __file__)
     dl_helper.log = log
     log.info('{}'.format(args))
-    if args.odir:
-        config.out_dir = args.odir
+    if args.out_dir:
+        config.out_dir = args.out_dir
     if args.format:
         config.format = int(args.format)
     if args.play_list:

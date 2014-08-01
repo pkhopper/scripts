@@ -55,10 +55,11 @@ def parse_args(config, argv):
     parser.add_argument('urls', nargs='*', help='urls')
     # parser.add_argument('urls', nargs='+', help='urls')
     parser.add_argument('-c', '--config', default='dlvideo.ini')
-    parser.add_argument('-o', '--odir')
+    parser.add_argument('-o', '--out_dir', default=config.out_dir)
     parser.add_argument('-i', '--interact', action='store_true')
     parser.add_argument('-l', '--play-list', dest='play_list', action='store_true')
     parser.add_argument('-f', '--format', help='0,1,2,3',choices=['0', '1', '2', '3'])
+    parser.add_argument('--dl_method', default=config.dl_method)
     args = parser.parse_args()
     # print args
     return args
@@ -70,4 +71,7 @@ def init_args_config(argv, script):
         config = Config(config=args.config, script=script)
         args = parse_args(config, argv)
     log = util.get_logger(logfile=config.log, level=config.log_level)
+    config.dl_method = args.dl_method
+    config.out_dir = args.out_dir
+    config.format = args.format
     return args, config, log
