@@ -213,8 +213,7 @@ class DownloadLiveStream(ThreadBase):
 
     def __prepair(self, url, out_dir, duration, proxy):
         assert duration is None or duration > 0
-        if self.duration and isinstance(duration, int):
-            self.duration = int(duration)
+        self.duration = duration
         self.out_dir = out_dir
         self.outfile = pjoin(out_dir, _util.get_time_string() + ".ts")
         self.url = url
@@ -259,6 +258,7 @@ class DownloadLiveStream(ThreadBase):
         stop_at = 0
         if self.duration:
             stop_at = start_at + self.duration
+        # self.log.info('duration=%d, start=%f, stop=%f', self.duration, start_at, stop_at)
         while not self.isSetToStop() or self.__run_in_caller_thread:
             loop_start_at = time.time()
             if self.duration and loop_start_at >= stop_at:
