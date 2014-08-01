@@ -7,8 +7,7 @@ import time
 import urllib
 import urllib2
 import Queue
-from sys import maxint as _maxint
-from StringIO import StringIO
+from io import BytesIO
 from time import sleep
 from socket import timeout as _socket_timeout
 
@@ -107,7 +106,9 @@ class M3u8Stream(ThreadBase):
                 urls, targetduration = self.__get_curr_index()
                 for url in urls:
                     if url not in self.__old_urls:
-                        urlwork = DownloadUrl(url, out=StringIO(), n=3, log=self.log)
+                        memfile = BytesIO()
+                        memfile.read = memfile.getvalue
+                        urlwork = DownloadUrl(url, out=memfile, n=3, log=self.log)
                         self.__urlworks_queue.put(urlwork)
                         self.__old_urls[url] = True
                         stream_len += targetduration
