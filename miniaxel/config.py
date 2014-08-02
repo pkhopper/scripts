@@ -2,74 +2,38 @@
 # coding=utf-8
 
 import os
-from vavava.util import script_path as _script_path
-from vavava.util import get_logger as _get_logger
+from vavava import scriptutils
+
 pjoin = os.path.join
 pdirname = os.path.dirname
 pabspath = os.path.abspath
 
 
-class Config:
-
-    def __init__(self, config='miniaxel.ini'):
-        import ConfigParser
-        cfg = ConfigParser.ConfigParser()
-        if os.path.exists(config):
-            cfg.read(pabspath(config))
-        else:
-            cfg.read(pjoin(_script_path(__file__), config))
-        self.out_dir = cfg.get('default', 'out_dir')
-        self.retrans = cfg.getboolean('default', 'retrans')
-        self.tmin = cfg.getint('default', 'tmin')
-        self.tmax = cfg.getint('default', 'tmax')
-        self.threadnum = cfg.getint('default', 'threadnum')
-        self.log_level = cfg.get('default', 'log_level')
-        self.log_file = cfg.get('default', 'log_file')
-        if cfg.getboolean('proxy', 'enable'):
-            self.proxy = cfg.get('proxy', 'addr')
-        else:
-            self.proxy = None
-        lvlconvert = {
-            'critical' : 50,
-            'fatal' : 50,
-            'error' : 40,
-            'warning' : 30,
-            'warn' : 30,
-            'info' : 20,
-            'debug' : 10,
-            'notset' : 0
+class MiniAxelConfig(scriptutils.BaseConfig):
+    def get_ini_attrs(self):
+        return {
+            'default|out_dir  |s': None,
+            'default|retrans  |b': None,
+            'default|tmin     |i': None,
+            'default|tmax     |i': None,
+            'default|nthread  |i': None,
+            'proxy  |enable   |b': None,
+            'proxy  |addr     |s': None,
+            '       |log      | ': scriptutils.get_log_from_config
         }
-        if self.log_level:
-            self.log_level = lvlconvert[self.log_level.strip().lower()]
 
-
-def parse_args(cfg, prog):
-    usage = """./mini """
-    import argparse
-    parser=argparse.ArgumentParser(prog=prog, usage=usage, description='mini axel', version='0.1')
-    parser.add_argument('urls', nargs='*', help='urls')
-    parser.add_argument('-c', '--config', default='miniaxel.ini')
-    parser.add_argument('-r', '--retransmission', action='store_true', default=cfg.retrans)
-    parser.add_argument('-o', '--outdir', dest='out_dir', default=cfg.out_dir)
-    parser.add_argument('-p', '--proxy', dest='proxy', action='store_true', default=cfg.proxy)
-    parser.add_argument('-n', '--threadnum', default=cfg.threadnum)
-    args = parser.parse_args()
-    return args
-
-
-def init_args_config(prog):
-    cfg = Config()
-    args = parse_args(cfg, prog)
-    if args.config != 'miniaxel.ini':
-        cfg = Config(config=args.config)
-        args = parse_args(cfg, prog)
-    log = _get_logger(logfile=cfg.log_file, level=cfg.log_level)
-    cfg.retrans = args.retransmission
-    cfg.out_dir = args.out_dir
-    cfg.threadnum = args.threadnum
-    log.info('{}'.format(args))
-    return args, cfg, log
-
+    def get_args(self, argv):
+        usage = """./mini """
+        import argparse
+        parser=argparse.ArgumentParser(prog=argv, usage=usage, description='mini axel', version='0.1')
+        parser.add_argument('urls', nargs='*')
+        parser.add_argument('-c', '--config')
+        parser.add_argument('-r', '--retrans', action='store_true')
+        parser.add_argument('-o', '--out_dir')
+        parser.add_argument('-p', '--proxy', dest='proxy', action='store_true')
+        parser.add_argument('-n', '--nthread')
+        args = parser.parse_args()
+        return args
 
 def test_miniaxel(self):
     from vavava import util
@@ -94,3 +58,9 @@ def test_miniaxel(self):
         finally:
             if os.path.exists(out_file):
                 os.remove(out_file)
+
+if __name__ == '__main__':
+    import sys
+    cfg = MiniAxelConfig()
+    cfg.read_cmdline_config('miniaxel.ini', sys.argv)
+    print cfg
