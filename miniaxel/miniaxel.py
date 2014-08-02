@@ -21,50 +21,50 @@ test_urls = {
         # 'asdf': 'http://vavava.baoyibj.com/chaguan/'
 }
 
-
-class ftest:
-    def test(self, axel, url, md5, n, log):
-        self.url = url
-        self.md5 = md5
-        self.log = log
-        self.n = n
-        axel.addUrl(url, out=md5, n=3, archive_callback=self.archive_callback)
-
-    def archive_callback(self, wk):
+def fTestFunc(axel, url, md5, n, log):
+    name = 'fTestFunc.%d' % n
+    def archive_callback(wk):
         if not wk.isArchived():
-            self.log.error('[fileTest] wk not archive')
+            log.error('[fTestFunc] wk not archive')
             return
-        with open(self.md5, 'rb') as fp:
-            ss = util.md5_for_file(fp)
-        os.remove(self.md5)
-        if self.md5 != ss:
-            self.log.error('[fileTest] md5 not match, n={}, {}'.format(self.n, ss))
+        with open(name, 'rb') as fp:
+            newmd5 = util.md5_for_file(fp)
+        os.remove(name)
+        if md5 != newmd5:
+            log.error('[fTestFunc] md5 not match, n={}, {} ({})'.format(n, newmd5, md5))
         else:
-            self.log.info('[fileTest] match, n=%d', self.n)
-filetest = ftest()
+            log.info('[fTestFunc] n=%d', n)
+        return
+    axel.addUrl(url, out=name, n=n, archive_callback=archive_callback)
 
-class mtest:
-    def test(self, axel, url, md5, n, log):
-        self.url = url
-        self.md5 = md5
-        self.log = log
-        self.n = n
-        from io import BytesIO
-        self.fp = BytesIO()
-        axel.addUrl(url, out=self.fp, n=3, archive_callback=self.archive_callback)
-
-    def archive_callback(self, wk):
+def mTestFunc(axel, url, md5, n, log):
+    from io import BytesIO
+    fp = BytesIO()
+    name = 'mTestFunc.%d' % n
+    def archive_callback(wk):
         if not wk.isArchived():
-            self.log.error('[fileTest] wk not archive')
+            log.error('[mTestFunc] wk not archive')
             return
-        ss = util.md5_for_file(self.fp)
-        self.fp.close()
-        del self.fp
-        if self.md5 != ss:
-            self.log.error('[memTest] md5 not match, n={}, {}'.format(self.n, ss))
+        with open(name, 'wb') as ff:
+            ff.write(fp.getvalue())
+        with open(name, 'rb') as ff:
+            newmd5 = util.md5_for_file(ff)
+        os.remove(name)
+        if md5 != newmd5:
+            log.error('[mTestFunc] md5 not match, n={}, {}'.format(n, newmd5))
         else:
-            self.log.info('[memTest] match, n=%d', self.n)
-memtest = mtest()
+            log.info('[mTestFunc] n=%d', n)
+        return
+    axel.addUrl(url, out=fp, n=n, archive_callback=archive_callback)
+
+def mainTest(axel, log):
+    cmd = raw_input('n=')
+    for n in cmd.split(','):
+        n = int(n)
+        for md5, url in test_urls.items():
+            fTestFunc(axel, url, md5, n, log)
+            # mTestFunc(axel, url, md5, n, log)
+            log.debug('add a test work: %s,%s,%d', url, md5, n)
 
 
 def usage():
@@ -101,10 +101,7 @@ def main(argv):
             elif cmd in ('h'):
                 print usage()
             elif cmd in('test'):
-                for md5, url in test_urls.items():
-                    filetest.test(axel, url, md5, cfg.nthread, log)
-                    # memtest.test(axel, url, md5, cfg.nthread, log)
-                    log.debug('add a test work: %s,%s,%d', url, md5, cfg.nthread)
+                mainTest(axel, log)
             else:
                 url = cmd
                 name = pjoin(cfg.out_dir, find_name(url))
