@@ -10,6 +10,7 @@ pabspath = os.path.abspath
 
 
 class MiniAxelConfig(scriptutils.BaseConfig):
+
     def get_ini_attrs(self):
         return {
             'default|out_dir  |s': None,
@@ -19,7 +20,7 @@ class MiniAxelConfig(scriptutils.BaseConfig):
             'default|nthread  |i': None,
             'proxy  |enable   |b': None,
             'proxy  |addr     |s': None,
-            '       |log      | ': scriptutils.get_log_from_config
+            '       |log      | ': scriptutils.get_log_from_config()
         }
 
     def get_args(self, argv):
@@ -35,7 +36,7 @@ class MiniAxelConfig(scriptutils.BaseConfig):
         args = parser.parse_args()
         return args
 
-def test_miniaxel(self):
+def miniaxel_test(self):
     from vavava import util
     url = r'http://cdn.mysql.com/Downloads/Connector-J/mysql-connector-java-gpl-5.1.31.msi'
     orig_md5 = r'140c4a7c9735dd3006a877a9acca3c31'

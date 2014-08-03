@@ -84,7 +84,7 @@ def find_name(url):
 
 def main(argv):
     cfg = config.MiniAxelConfig()
-    cfg.read_cmdline_config('miniaxel.ini', sys.argv)
+    cfg.read_cmdline_config('miniaxel.ini', script=__file__, argv=sys.argv)
     log = cfg.log
     axel = MiniAxelWorkShop(tmin=cfg.tmin, tmax=cfg.tmax, bar=True, retrans=True, log=log)
     try:

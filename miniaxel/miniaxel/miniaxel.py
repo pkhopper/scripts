@@ -41,10 +41,10 @@ class DownloadUrl:
 
         self.__subworks = []
         self.__err_ev = _Event()
-        self.__initialised_ev = _Event()
         self.__file_mutex = _Lock()
-        self.__err_ev.clear()
-        self.__initialised_ev.clear()
+        # self.__err_ev.clear()
+        # 0/1/2/3 init/processing/finish/error
+        self.__status = 0
 
     def __get_content_len(self, url):
         http = HttpUtil()
@@ -60,8 +60,8 @@ class DownloadUrl:
             return None
 
     def getSubWorks(self):
-        if self.__initialised_ev.is_set():
-            raise ValueError('can not reinitialise')
+        assert self.__status == 0
+        self.__status = 1
         self.__err_ev.clear()
         cur_size = 0
         size = self.__get_content_len(self.url)
@@ -81,6 +81,7 @@ class DownloadUrl:
 
         # can not retransmission
         if self.n == 1 or clip_ranges is None or size is None or size == 0:
+            self.log.debug('[DownloadUrl] can not retransmission, %s', self.url)
             clip_ranges = [None]
             size = 0
 
@@ -91,23 +92,18 @@ class DownloadUrl:
         for clip_range in clip_ranges:
             work = DownloadUrl.HttpDLSubWork(
                 url=self.url, fp=self.__fp, file_mutex=self.__file_mutex,
-                range=clip_range, proxy=self.proxy, parent=self, callback=self.update
+                range=clip_range, parent=self, proxy=self.proxy, callback=self.update
             )
             self.__subworks.append(work)
-
-        self.__initialised_ev.set()   # !!!
+            self.__status = 2
         return self.__subworks
 
-    def isInitialised(self):
-        return self.__initialised_ev.isSet()
-
     def isArchived(self):
-        if not self.isInitialised():
+        if self.__status < 2 or self.isErrorHappen():
             return False
-        if not self.isErrorHappen():
-            for work in self.__subworks:
-                if work.isWorking():
-                    return False
+        for work in self.__subworks:
+            if work.isProcessing():
+                return False
         return True
 
     def setError(self):
@@ -121,7 +117,6 @@ class DownloadUrl:
             work.setStop()
 
     def wait(self):
-        # ????????
         for work in self.__subworks:
             work.wait()
 
@@ -154,8 +149,8 @@ class DownloadUrl:
 
     class HttpDLSubWork(threadutil.WorkBase):
 
-        def __init__(self, url, fp, file_mutex=None, range=None,
-                     proxy=None, parent=None, callback=None):
+        def __init__(self, url, fp, range, parent, file_mutex=None,
+                     proxy=None, callback=None):
             threadutil.WorkBase.__init__(self)
             self.url = url
             self.fp = fp
@@ -163,52 +158,29 @@ class DownloadUrl:
             self.proxy = proxy
             self.file_mutex = file_mutex
             self.parent = parent
-            self.downloader = None
-            self.__stop_ev = _Event()
-            self.__working = True
             self.__callback = callback
+            self.__retry_count = 0
             self.__http_fetcher = HttpFetcher()
             if self.proxy:
                 self.__http_fetcher.set_proxy(self.proxy)
 
-        def isWorking(self):
-            return self.__working # and self.__http_fetcher.isFetching()
-
-        def __is_setstop(self):
-            return self.__stop_ev.isSet()
-
         def setStop(self):
-            self.__http_fetcher.setStop()       # stop fetch
-            self.__stop_ev.set()                # stop re-fetch
-
-        def wait(self, timeout=None):
-            import time
-            while self.__working:
-                time.sleep(0.5)
-                if timeout < 0:
-                    raise RuntimeError('HttpDLSubWork timeout')
-                timeout -= 0.5
+            threadutil.WorkBase.setStop(self)
+            self.__http_fetcher.setStop()
 
         def work(self, this_thread, log):
-            # log.debug('[wk] start working, %s', self.url)
-            self.__stop_ev.clear()
-            self.__working = True
-            try:
-                self.__work(this_thread, log)
-            except:
-                raise
-            finally:
-                self.__working = False
-
-        def __work(self, this_thread, log):
-
-            while not this_thread.isSetToStop() and not self.__is_setstop():
+            while not this_thread.isSetToStop() and not self.isSetStop():
                 try:
                     self.__http_fetcher.fetch(self.url, fp=self.fp, range=self.range,
                             file_mutex=self.file_mutex, callback=self.__callback)
                     return
                 except _socket_timeout:
-                    log.debug('[HttpDLSubWork] timeout  %s', self.url)
+                    self.__retry_count += 1
+                    start_at = self.__http_fetcher.handler.start_at
+                    end_at = self.__http_fetcher.handler.end_at
+                    log.debug('[HttpDLSubWork] timeout(%d-[%d,%d])  %s', self.__retry_count,
+                              start_at, end_at, self.url)
+                    _sleep(1)
                 except urllib2.URLError as e:
                     # log.debug('[HttpDLSubWork] Network not work :(')
                     log.exception(e)
@@ -217,7 +189,7 @@ class DownloadUrl:
                         self.parent.setError()
                     self.is_err_happen = True
                     raise
-                _sleep(1)
+
 
 
 class MiniAxelWorkShop(threadutil.ThreadBase):
@@ -237,12 +209,15 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
         self.__buff_urlwks.put(urlwk)
         self.log.debug('[axel] add a work: %s', url)
 
+
     def addUrlWorks(self, works):
         for wk in works:
-            assert isinstance(wk, DownloadUrl)
-            self.__buff_urlwks.put(wk)
-            self.log.debug('[axel] add a work: %s', wk.url)
+            self.addUrlWork(wk)
 
+    def addUrlWork(self, wk):
+        assert isinstance(wk, DownloadUrl)
+        self.__buff_urlwks.put(wk)
+        self.log.debug('[axel] add a work: %s', wk.url)
 
     def run(self):
         self.log.debug('[axel] start serving')
@@ -263,8 +238,8 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
             urlwk.setStop()
             urlwk.wait()
             urlwk.cleanUp()
-        self.__ws.setShopClose()
-        self.__ws.waitShopClose()
+        self.__ws.setStop()
+        self.__ws.join()
         self.log.debug('[axel] stop serving')
 
     def __loop(self):
@@ -386,12 +361,6 @@ class HistoryFile:
                         assert size <= b - a + 1
                     break
 
-    def clean(self):
-        with self.__mutex:
-            if self.txt:
-                if os.path.exists(self.txt):
-                    os.remove(self.txt)
-
     def update_file(self, force=False):
         str = ''
         with self.__mutex:
@@ -405,3 +374,12 @@ class HistoryFile:
                     assert a <= (b + 1)
         with open(self.txt, 'w') as fp:
             fp.write(str)
+
+    def clean(self):
+        with self.__mutex:
+            for (a, b) in self.parts:
+                if a < b + 1:
+                    self.update_file(force=True)
+            if self.txt:
+                if os.path.exists(self.txt):
+                    os.remove(self.txt)
