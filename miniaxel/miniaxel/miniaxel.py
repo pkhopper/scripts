@@ -24,15 +24,13 @@ pabspath = os.path.abspath
 
 class DownloadUrl:
 
-    def __init__(self, url, out, n=1, proxy=None, bar=False, retrans=False,
+    def __init__(self, url, out, n=1, proxy=None, bar=None, retrans=False,
                  headers=None, archive_callback=None, log=None):
         self.url = url
         self.out = out
         self.n = n
         self.proxy = proxy
-        self.progress_bar = None
-        if bar:
-            self.progress_bar = ProgressBar()
+        self.progress_bar = bar
         self.retransmission = retrans
         self.__history_file = None
         self.headers = headers
@@ -51,15 +49,17 @@ class DownloadUrl:
         if self.proxy:
             http.set_proxy(self.proxy)
         info = http.head(url)
-        try:
-            if info.getheader('Accept-Ranges') == 'bytes':
-                return int(info.getheader('Content-Length'))
-        except:
-            if info is not None:
-                self.log.error(str(info.msg.headers))
-            return None
+        if 200 <= info.status < 300:
+            return int(info.getheader('Content-Length'))
+        else:
+            resp = http.get_response(url)
+            if 200 <= resp.code < 300:
+                # assert resp.has_header('Accept-Ranges')
+                length = int(resp.headers.get('Content-Length'))
+                resp.close()
+                return length
 
-    def getSubWorks(self):
+    def makeSubWorks(self):
         assert self.__status == 0
         self.__status = 1
         self.__err_ev.clear()
@@ -76,17 +76,18 @@ class DownloadUrl:
             self.__fp = open(self.out, 'wb')
 
         if size and self.retransmission:
+            self.retransmission = False
             self.__history_file = HistoryFile()
             clip_ranges, cur_size = self.__history_file.mk_clips(self.out, clip_ranges, size)
 
         # can not retransmission
-        if self.n == 1 or clip_ranges is None or size is None or size == 0:
+        if clip_ranges is None or size is None or size == 0:
             self.log.debug('[DownloadUrl] can not retransmission, %s', self.url)
             clip_ranges = [None]
             size = 0
 
         if self.progress_bar:
-            self.progress_bar.reset(total_size=size, cur_size=cur_size)
+            self.progress_bar.set(total_size=size, cur_size=cur_size)
 
         self.__subworks = []
         for clip_range in clip_ranges:
@@ -134,7 +135,8 @@ class DownloadUrl:
         if self.progress_bar:
             self.progress_bar.display(force=True)
         if self.retransmission:
-            self.__history_file.clean()
+            if self.__history_file:
+                self.__history_file.cleanUp()
         else:
             # del unfinished file
             if not self.isArchived():
@@ -196,7 +198,10 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
 
     def __init__(self, tmin=10, tmax=20, bar=True, retrans=False, log=None):
         threadutil.ThreadBase.__init__(self, log=log)
-        self.bar = bar
+        if bar:
+            self.progress_bar = ProgressBar()
+        else:
+            self.progress_bar = None
         self.retrans = retrans
         self.__buff_urlwks = Queue.Queue()
         self.__urlwks = []
@@ -204,7 +209,7 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
 
     def addUrl(self, url, out, headers=None, n=5, archive_callback=None):
         urlwk = DownloadUrl(url, out=out, headers=headers,
-                    n=n, retrans=self.retrans, bar=self.bar,
+                    n=n, retrans=self.retrans, bar=self.progress_bar,
                     archive_callback=archive_callback, log=self.log)
         self.__buff_urlwks.put(urlwk)
         self.log.debug('[axel] add a work: %s', url)
@@ -243,9 +248,10 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
         self.log.debug('[axel] stop serving')
 
     def __loop(self):
+        self.progress_bar.display()
         if not self.__buff_urlwks.empty():
             urlwk = self.__buff_urlwks.get()
-            self.__ws.addWorks(urlwk.getSubWorks())
+            self.__ws.addWorks(urlwk.makeSubWorks())
             self.__urlwks.append(urlwk)
             self.log.debug('[axel] pop a work: %s', urlwk.url)
         for i, urlwk in enumerate(self.__urlwks):
@@ -263,51 +269,61 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
 
 class ProgressBar:
 
-    def __init__(self, size=None):
-        self.reset(size, 0)
+    def __init__(self):
         self.mutex = _Lock()
-
-    def reset(self, total_size, cur_size):
-        self.size = total_size
-        if self.size == 0:
-            self.size = 1
-        self.cur_size = cur_size
+        self.total_size =0
+        self.curr_size =0
         self.last_size = 0
-        self.last_updat = self.start = _time()
+        self.last_updat_at = 0
+        self.start_at = 0
+        self.sub_bar_count = 0
+
+    def set(self, total_size, cur_size):
+        with self.mutex:
+            self.sub_bar_count += 1
+            self.total_size += total_size
+            self.curr_size += cur_size
+            self.last_updat_at = _time()
+            self.last_size = self.curr_size
+            if self.start_at == 0:
+                self.start_at = self.last_updat_at
 
     def update(self, data_size):
         with self.mutex:
-            self.cur_size += data_size
+            self.curr_size += data_size
+            return
 
     def display(self, force=False):
-        assert self.size is not None
+        if self.last_updat_at < 1:
+            return
         now = _time()
-        duration = now - self.last_updat
+        duration = now - self.last_updat_at
         if not force and duration < 1:
             # print '*******%d-%d=%d'%(now, self.last_updat, duration)
             return
-        percentage = 10.0*self.cur_size/self.size
+        percentage = 10.0*self.curr_size/max(self.total_size, 1)
         if duration == 0:
             speed = 0
         else:
-            speed = (self.cur_size - self.last_size)/duration
-        output_format = '\r[%3.1d%% %5.1dk/s][ %5.1ds/%5.1ds] [%dk/%dk]            '
+            speed = (self.curr_size - self.last_size)/duration
+        output_format = '\r[%d][%3.1d%% %5.1dk/s][ %5.1ds/%5.1ds] [%dk/%dk]            '
         if speed > 0:
-            output = output_format % (percentage*10, speed/1024, now - self.start,
-                (self.size-self.cur_size)/speed, self.cur_size/1024, self.size/1024)
+            output = output_format % (self.sub_bar_count, percentage*10, speed/1024,
+                                      now - self.start_at, (self.total_size-self.curr_size)/speed,
+                                      self.curr_size/1024, self.total_size/1024)
         else:
-            if self.cur_size == 0:
+            if self.curr_size == 0:
                 expect = 0
             else:
-                expect = (self.size-self.cur_size)*(now-self.start)/self.cur_size
-            output = output_format % (percentage*10, 0, now - self.start, expect,
-                                       self.cur_size/1024, self.size/1024)
+                expect = (self.total_size-self.curr_size)*(now-self.start_at)/self.curr_size
+            output = output_format % (self.sub_bar_count, percentage*10, 0, now - self.start_at,
+                                      expect, self.curr_size/1024, self.total_size/1024)
         sys.stdout.write(output)
         if percentage == 100:
             sys.stdout.write('\n')
         sys.stdout.flush()
-        self.last_updat = now
-        self.last_size = self.cur_size
+        self.last_updat_at = now
+        self.last_size = self.curr_size
         if force and percentage == 10:
             print ''
 
@@ -375,11 +391,11 @@ class HistoryFile:
         with open(self.txt, 'w') as fp:
             fp.write(str)
 
-    def clean(self):
+    def cleanUp(self):
         with self.__mutex:
-            for (a, b) in self.parts:
-                if a < b + 1:
-                    self.update_file(force=True)
+            # for (a, b) in self.parts:
+            #     if a < b + 1:
+            #         self.update_file(force=True)
             if self.txt:
                 if os.path.exists(self.txt):
                     os.remove(self.txt)
