@@ -21,43 +21,47 @@ def tudou_download_by_iid(iid, title):
     xml = HttpUtil().get(url)
     xml = unescape_html(xml)
     url = BeautifulSoup(xml).find('f').text
-    return url, title, 'flv', 1, headers
+    return [url], title, 'flv', 1, headers
 
 # def tudou_download_by_id(id, title, merge=True):
 #     html = get_html('http://www.tudou.com/programs/view/%s/' % id)
 #     iid = r1(r'iid\s*=\s*(\S+)', html)
 #     tudou_download_by_iid(iid, title, merge=merge)
 
-def tudou_download(url):
+def tudou_download(url, vidfmt):
     http = HttpUtil()
     html = http.get(url)
-    html = html.decode(http.parse_charset())
-    # iid = r1(r'iid\s*[:=]\s*(\d+)', html)
+    charset = http.parse_charset()
+    html = html.decode(charset)
     iid = r1(r'"k":([^,]*),', html)
+    if not iid:
+        iid = r1(r'iid\s*[:=]\s*(\d+)', html)
     assert iid
     title = r1(r"kw\s*[:=]\s*['\"]([^']+)['\"]", html)
     assert title
     title = unescape_html(title)
     return tudou_download_by_iid(iid, title)
 
-def tudou_with_youku_info(url):
+def tudou_with_youku_info(url, vidfmt):
     http = HttpUtil()
     html = http.get(url)
     vcode = re.search(r'vcode\s*[:=]\s*\'([^\']+)\'', html)
     vcode = vcode.group(1)
     url = 'http://v.youku.com/v_show/id_{0}.html'.format(vcode)
     import flvcd
-    return flvcd.FLVCD().info(url)
+    return flvcd.FLVCD().info(url, vidfmt)
 
 
 class Tudou(VidParserBase):
     def info(self, url, vidfmt=0):
-        return tudou_download(url)
+        return tudou_download(url, vidfmt)
+        # return tudou_with_youku_info(url, vidfmt)
 
 
 if __name__ == '__main__':
     url = r'http://www.tudou.com/programs/view/CLyCxUY7Tsg/'
     url = r'http://www.tudou.com/programs/view/hVT9-loKZ_M/'
+    url = r'http://www.tudou.com/albumplay/Fc3ucjm9JAU/-MBM-RDnxIc.html'
     info = Tudou().info(url)
     print info
 
