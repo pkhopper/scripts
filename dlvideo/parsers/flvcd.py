@@ -25,8 +25,8 @@ class FLVCD(VidParserBase):
             m3u = soup.find('input', attrs={'name': 'inf'}).get('value')
             title = soup.find('input', attrs={'name': 'name'}).get('value')
         except Exception as e:
-            print e
-            raise ValueError('not support')
+            # raise ValueError('not support')
+            return [], '', None, 0, None
         urls = [url for url in m3u.split('|')]
         return urls, title, None, 5, None
 

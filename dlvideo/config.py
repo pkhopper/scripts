@@ -10,7 +10,7 @@ class DLVideoConfig(scriptutils.BaseConfig):
     def get_ini_attrs(self):
         return {
             'default|outpath         |s': None,
-            'default|format          |i': None,
+            'default|vidfmt          |i': None,
             'default|dlmethod        |s': None,
             'default|npf             |i': None,
             'default|tmin            |i': None,
