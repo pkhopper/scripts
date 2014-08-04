@@ -13,7 +13,7 @@ from socket import timeout as _socket_timeout
 from vavava import util as _util
 from vavava.threadutil import ThreadBase
 from vavava.httputil import HttpUtil
-from miniaxel.miniaxel import DownloadUrl, ProgressBar
+from miniaxel.miniaxel import UrlTask, ProgressBar
 
 _util.set_default_utf8()
 
@@ -106,8 +106,8 @@ class M3u8Stream(ThreadBase):
             if url not in self.__oldurls:
                 memfile = BytesIO()
                 memfile.read = memfile.getvalue
-                urlwork = DownloadUrl(url, out=memfile, n=self.__npf,
-                                      bar=self.__progress_bar, log=self.log)
+                urlwork = UrlTask(url, out=memfile, npf=self.__npf,
+                                  bar=self.__progress_bar, log=self.log)
                 self.__urlwks_q.put(urlwork)
                 self.__oldurls[url] = True
                 self.__axel.addUrlWork(urlwork)
