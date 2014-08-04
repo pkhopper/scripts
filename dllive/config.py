@@ -13,6 +13,7 @@ class DLLiveConfig(scriptutils.BaseConfig):
             'default  |liveurl  |s': None,
             'default  |addrfile |s': None,
             'default  |npf      |i': None,
+            'default  |freq     |i': None,
             'network  |tmin     |i': None,
             'network  |tmax     |i': None,
             # 'proxy    |enable   |b': None,

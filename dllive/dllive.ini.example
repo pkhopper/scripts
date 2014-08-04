@@ -1,10 +1,21 @@
 [default]
-out_dir =
-channel = http://***/playlist.m3u8
+outpath =
+channel =
+liveurl = http://live.3gv.ifeng.com/live/zhongwen.m3u8
+addrfile = address.txt
+log = dllive.log
+log_level = info
+; n parts per file
+npf=3
+freq=6
 
-[address_file]
-name = address.txt
+[network]
+tmin = 10
+tmax = 20
 
 [proxy]
 enable = false
 addr =
+
+[favorites]
+pptv = http://web-play.pptv.com/web-m3u8-301228.m3u8?type=m3u8.web.pad
