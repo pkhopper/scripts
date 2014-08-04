@@ -8,7 +8,6 @@ import urllib2
 import Queue
 from io import BytesIO
 from time import time as _time, sleep as _sleep
-from threading import Event as _Event
 from threading import Lock as _Lock
 from socket import timeout as _socket_timeout
 from vavava.httputil import HttpUtil, HttpFetcher
@@ -22,34 +21,24 @@ pdirname = os.path.dirname
 pabspath = os.path.abspath
 
 
-class DownloadUrl:
-    def __init__(self, url, out, n=1, proxy=None, bar=None, retrans=False,
-                 headers=None, archive_callback=None, log=None):
+class UrlTask(threadutil.TaskBase):
+    def __init__(self, url, out, npf=1, proxy=None, bar=None, retrans=False,
+                 headers=None, log=None, callback=None):
+        threadutil.TaskBase.__init__(self, log=log, callback=callback)
         self.url = url
         self.out = out
-        self.n = n
+        self.npf = npf
         self.proxy = proxy
         self.progress_bar = bar
         self.retransmission = retrans
         self.__history_file = None
         self.headers = headers
-        self.archive_callback = archive_callback
-        self.log = log
-
-        self.__subworks = []
-        self.__err_ev = _Event()
         self.__file_mutex = _Lock()
-        # self.__err_ev.clear()
-        # 0/1/2/3 init/processing/finish/error
-        self.__status = 0
 
     def makeSubWorks(self):
-        assert self.__status == 0
-        self.__status = 1
-        self.__err_ev.clear()
         cur_size = 0
         size = self.__get_content_len(self.url)
-        clip_ranges = HttpFetcher.div_file(size, self.n)
+        clip_ranges = HttpFetcher.div_file(size, self.npf)
 
         if isinstance(self.out, file) or isinstance(self.out, BytesIO):
             self.__fp = self.out
@@ -75,12 +64,11 @@ class DownloadUrl:
 
         self.__subworks = []
         for clip_range in clip_ranges:
-            work = DownloadUrl.HttpDLSubWork(
+            work = UrlTask.HttpDLSubWork(
                 url=self.url, fp=self.__fp, file_mutex=self.__file_mutex,
                 data_range=clip_range, parent=self, proxy=self.proxy, callback=self.update
             )
             self.__subworks.append(work)
-            self.__status = 2
         return self.__subworks
 
     def __get_content_len(self, url):
@@ -101,28 +89,6 @@ class DownloadUrl:
     def setProgressBar(self, bar):
         self.progress_bar = bar
 
-    def isArchived(self):
-        if self.__status < 2 or self.isErrorHappen():
-            return False
-        for work in self.__subworks:
-            if work.isProcessing():
-                return False
-        return True
-
-    def setError(self):
-        self.__err_ev.set()
-
-    def isErrorHappen(self):
-        return self.__err_ev.isSet()
-
-    def setToStop(self):
-        for work in self.__subworks:
-            work.setToStop()
-
-    def waitForFinish(self):
-        for work in self.__subworks:
-            work.waitForFinish()
-
     def update(self, offset, size):
         if self.progress_bar:
             self.progress_bar.update(size)
@@ -136,23 +102,20 @@ class DownloadUrl:
     def cleanup(self):
         if self.progress_bar:
             self.progress_bar.display(force=True)
-        self.log.debug('=============== 1')
         if self.retransmission:
             if self.__history_file:
-                self.log.debug('=============== 2')
                 self.__history_file.cleanup()
         else:
-            self.log.debug('=============== 3')
             # del unfinished file
             if not self.isArchived():
-                is_external_file = isinstance(self.out, BytesIO) or isinstance(self.out, file)
+                is_external_file = isinstance(self.out, BytesIO) \
+                                   or isinstance(self.out, file)
                 if not is_external_file:
                     if os.path.exists(self.out):
                         if self.__fp and self.__fp.closed:
                             self.__fp.close()
                         os.remove(self.out)
-        if self.archive_callback:
-            self.archive_callback(self)
+        threadutil.TaskBase.cleanup(self)
 
     class HttpDLSubWork(threadutil.WorkBase):
 
@@ -199,7 +162,6 @@ class DownloadUrl:
 
 
 class MiniAxelWorkShop(threadutil.ThreadBase):
-
     def __init__(self, tmin=10, tmax=20, bar=None, retrans=False, log=None):
         threadutil.ThreadBase.__init__(self, log=log)
         self.progress_bar = bar
@@ -208,10 +170,10 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
         self.__urlwks = []
         self.__ws = threadutil.WorkShop(tmin=tmin, tmax=tmax, log=log)
 
-    def addUrl(self, url, out, headers=None, n=5, archive_callback=None):
-        urlwk = DownloadUrl(url, out=out, headers=headers,
-                    n=n, retrans=self.retrans, bar=self.progress_bar,
-                    archive_callback=archive_callback, log=self.log)
+    def addUrl(self, url, out, headers=None, npf=5, callback=None):
+        urlwk = UrlTask(url, out=out, headers=headers, npf=npf,
+                        retrans=self.retrans, bar=self.progress_bar,
+                        log=self.log, callback=callback)
         self.__buff_urlwks.put(urlwk)
         self.log.debug('[axel] add a work: %s', url)
 
@@ -221,7 +183,7 @@ class MiniAxelWorkShop(threadutil.ThreadBase):
             self.addUrlWork(wk)
 
     def addUrlWork(self, wk):
-        assert isinstance(wk, DownloadUrl)
+        assert isinstance(wk, UrlTask)
         wk.setProgressBar(self.progress_bar)
         self.__buff_urlwks.put(wk)
         self.log.debug('[axel] add a work: %s', wk.url)
