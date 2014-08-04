@@ -4,7 +4,7 @@
 import os
 import sys
 from vavava import util
-from miniaxel.miniaxel import MiniAxelWorkShop
+from miniaxel.miniaxel import MiniAxelWorkShop, ProgressBar
 import config
 
 
@@ -86,7 +86,8 @@ def main(argv):
     cfg = config.MiniAxelConfig()
     cfg.read_cmdline_config('miniaxel.ini', script=__file__, argv=sys.argv)
     log = cfg.log
-    axel = MiniAxelWorkShop(tmin=cfg.tmin, tmax=cfg.tmax, bar=True, retrans=True, log=log)
+    bar = ProgressBar()
+    axel = MiniAxelWorkShop(tmin=cfg.tmin, tmax=cfg.tmax, bar=bar, retrans=True, log=log)
     try:
         axel.start()
         if hasattr(cfg, 'urls'):

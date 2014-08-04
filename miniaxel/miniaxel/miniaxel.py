@@ -60,12 +60,12 @@ class DownloadUrl:
             self.__fp = open(self.out, 'wb')
 
         if size and self.retransmission:
-            self.retransmission = False
             self.__history_file = HistoryFile()
             clip_ranges, cur_size = self.__history_file.mk_clips(self.out, clip_ranges, size)
 
         # can not retransmission
         if clip_ranges is None or size is None or size == 0:
+            self.retransmission = False
             self.log.debug('[DownloadUrl] can not retransmission, %s', self.url)
             clip_ranges = [None]
             size = 0
@@ -136,10 +136,13 @@ class DownloadUrl:
     def cleanup(self):
         if self.progress_bar:
             self.progress_bar.display(force=True)
+        self.log.debug('=============== 1')
         if self.retransmission:
             if self.__history_file:
+                self.log.debug('=============== 2')
                 self.__history_file.cleanup()
         else:
+            self.log.debug('=============== 3')
             # del unfinished file
             if not self.isArchived():
                 is_external_file = isinstance(self.out, BytesIO) or isinstance(self.out, file)
@@ -197,12 +200,9 @@ class DownloadUrl:
 
 class MiniAxelWorkShop(threadutil.ThreadBase):
 
-    def __init__(self, tmin=10, tmax=20, bar=True, retrans=False, log=None):
+    def __init__(self, tmin=10, tmax=20, bar=None, retrans=False, log=None):
         threadutil.ThreadBase.__init__(self, log=log)
-        if bar:
-            self.progress_bar = ProgressBar()
-        else:
-            self.progress_bar = None
+        self.progress_bar = bar
         self.retrans = retrans
         self.__buff_urlwks = Queue.Queue()
         self.__urlwks = []
@@ -396,3 +396,14 @@ class HistoryFile:
             if self.txt:
                 if os.path.exists(self.txt):
                     os.remove(self.txt)
+
+    #
+    # def serve(self):
+    #     self.axel.start()
+    #     threadutil.WorkShop.serve()
+    #
+    # def join(self, timeout=None):
+    #     if self.axel.isAlive():
+    #         self.axel.setToStop()
+    #         self.axel.join(timeout)
+    #     threadutil.WorkShop.join(timeout)
