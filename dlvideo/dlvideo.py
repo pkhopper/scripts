@@ -6,8 +6,9 @@ import sys
 from time import sleep as _sleep
 from vavava import util
 from config import DLVideoConfig
-from miniaxel.miniaxel import MiniAxelWorkShop, ProgressBar
-from vaxel import VAxel, DLVWork
+from vavava.threadutil import WorkShop
+from miniaxel.miniaxel import ProgressBar
+from vaxel import VUrlTask
 
 util.set_default_utf8()
 import parsers
@@ -35,36 +36,26 @@ def main(cfg, log):
                 for i, clip in enumerate(cfg.urls):
                     fp.writelines(["[%03d] %s\n"%(i, clip)])
 
-    axel = MiniAxelWorkShop(tmin=cfg.tmin, tmax=cfg.tmax, bar=ProgressBar(), retrans=True, log=log)
-    vaxel = VAxel(axel=axel, log=log)
-
+    bar = ProgressBar()
+    ws = WorkShop(tmin=cfg.tmin, tmax=cfg.tmax, log=log)
     dlvs = []
     for i, url in enumerate(cfg.urls):
-        dlvideo = DLVWork(url, vidfmt=cfg.format, npf=cfg.npf,
-                              outpath=cfg.outpath, axel=axel, id=i, log=log)
+        dlvideo = VUrlTask(url, vidfmt=cfg.vidfmt, npf=cfg.npf,
+                           outpath=cfg.outpath, bar=bar, log=log)
         dlvs.append(dlvideo)
     try:
-        axel.start()
-        vaxel.serve()
-        vaxel.addWorks(dlvs)
+        ws.serve()
+        ws.addTasks(dlvs)
         while len(dlvs) > 0:
+            for i, dlv in enumerate(dlvs):
+                if dlv.isArchived() or dlv.isError():
+                    del dlvs[i]
             _sleep(1)
-            for i, wk in enumerate(dlvs):
-                if not wk.isProcessing():
-                    del dlvs
-            print sys.stdin.readline()
-    except:
-        pass
+    except Exception as e:
+        log.exception(e)
     finally:
-        axel.setToStop()
-        axel.join()
-        vaxel.setToStop()
-        vaxel.join()
-
-def interface():
-    i = 0
-    cmd = raw_input(i)
-
+        ws.setToStop()
+        ws.join()
 
 if __name__ == "__main__":
     cfg = DLVideoConfig().read_cmdline_config('dlvideo.ini', __file__, sys.argv)
