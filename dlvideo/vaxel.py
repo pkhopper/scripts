@@ -67,36 +67,44 @@ class VUrlTask(TaskBase):
         self.bar = bar
         self.outpath = outpath
         self.targetfiles = []
-        self.subtasks = []
 
-    def getSubWorks(self):
-        return self.makeSubWorks(url=self.url, vidfmt=self.vidfmt,
-                                  npf=self.npf, outpath=self.outpath)
+    def makeSubWorks(self):
+        urls, npf, headers = \
+            self.parse_url(self.url, self.vidfmt, self.npf, self.outpath)
+        if len(urls) == 0:
+            self.log.info('[VUrlTask] not a video page, %s', self.url)
+            return
+        if pexists(self.outname):
+            self.log.info('[VUrlTask] out put file exists, %s', self.outname)
+            return
+        util.assure_path(self.tmpdir)
+        self.log.debug('[VUrlTask] OUT FILE: %s', self.outname)
+        self.log.debug('[VUrlTask] TMP DIR: %s', self.tmpdir)
+        self.__makeSubWorks(urls, headers, npf)
+        if len(self.getSubTasks()) == 0:
+            self.cleanup()
+            return
+        for tsk in self.getSubTasks():
+            for wk in tsk.makeSubWorks():
+                self.subworks.append(wk)
+        return self.subworks
 
-    def makeSubWorks(self, url, vidfmt, npf, outpath):
-        parser = parsers.getVidPageParser(url)
+    def parse_url(self, url, vidfmt, npf, outpath):
+        parser = parsers.getVidPageParser(self.url)
         urls, title, self.ext, nperfile, headers = parser.info(url, vidfmt=vidfmt)
         urls = filter(lambda x: x.strip() != '', urls)
-        if len(urls) == 0:
-            self.log.info('[VUrlTask] not a video page, %s', url)
-            return []
         if not self.ext:
             self.ext = guess_ext(urls, title)
-        title = to_native_string(title)
-        self.outname = pjoin(outpath, '%s.%s' % (title, self.ext))
-        if pexists(self.outname):
-            self.log.debug('[VUrlTask] out put file exists, %s', self.outname)
-            return []
-        self.log.debug('[VUrlTask] OUT FILE: %s', self.outname)
         if nperfile:
             npf = nperfile
-        self.tmpdir = pjoin(outpath, escape_file_path(title) + '.downloading')
-        self.log.debug('[VUrlTask] TMP DIR: %s', self.tmpdir)
-        util.assure_path(self.tmpdir)
+        title = to_native_string(title)
+        self.outname = pjoin(self.outpath, '%s.%s' % (title, self.ext))
+        self.tmpdir = pjoin(self.outpath, escape_file_path(title) + '.downloading')
+        return urls, npf, headers
 
+    def __makeSubWorks(self, urls, headers, npf):
         self.targetfiles = []
         self.name_map = dict()
-        self.subworks = []
         for i, url in enumerate(urls):
             assert url.strip().startswith('http')
             tmpfile = pjoin(self.tmpdir, 'tmp_%d_%d.downloading.%s' % (len(urls), i+1, self.ext))
@@ -109,13 +117,11 @@ class VUrlTask(TaskBase):
             subtask = UrlTask(url, out=tmpfile, bar=self.bar, retrans=True,
                             headers=headers, npf=npf, log=self.log)
             self.addSubTask(subtask)
-        for tsk in self.getSubTasks():
-            for wk in tsk.getSubWorks():
-                self.subworks.append(wk)
-        return self.subworks
 
     def cleanup(self):
         wknum = len(self.targetfiles)
+        if wknum < 1:
+            return
         count = wknum - len(self.getSubTasks())
         for i, subtsk in enumerate(self.getSubTasks()):
             subtsk.cleanup()
@@ -124,15 +130,16 @@ class VUrlTask(TaskBase):
                 os.rename(subtsk.out, self.name_map[subtsk.out])
                 self.log.debug('[VUrlTask] clip complete (%d/%d): %s',
                                count, wknum, subtsk.out)
-        if count != len(self.getSubTasks()):
+        if count != wknum:
             self.log.info('[VUrlTask] not complete: %s', self.outname)
-        elif count > 0:
-            self.__merge()
-            for f in self.targetfiles:
-                if pexists(f):
-                    os.remove(f)
+            return
+        self.__merge()
+        for f in self.targetfiles:
+            if pexists(f):
+                os.remove(f)
+        if pexists(self.tmpdir):
             os.removedirs(self.tmpdir)
-            self.log.error('[VUrlTask] complete: %s', self.outname)
+        self.log.error('[VUrlTask] complete: %s', self.outname)
         TaskBase.cleanup(self)
 
     def __merge(self):
@@ -171,6 +178,7 @@ def main():
         while len(dlvs) > 0:
             for i, dlv in enumerate(dlvs):
                 if dlv.isArchived() or dlv.isError():
+                    dlvs[i].cleanup()
                     del dlvs[i]
             _sleep(1)
     except Exception as e:
