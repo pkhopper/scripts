@@ -5,7 +5,8 @@ import os
 import time
 from vavava import util as _util
 from vavava.httputil import HttpFetcher
-from miniaxel.miniaxel import MiniAxelWorkShop, ProgressBar
+from vavava.threadutil import WorkShop
+from miniaxel.miniaxel import ProgressBar
 from m3u8stream import M3u8Stream
 
 _util.set_default_utf8()
@@ -34,14 +35,14 @@ def recode(url, duration=None, outpath='./',
     log.info("|=> output: %s", outfile)
 
     _util.assure_path(outpath)
-    axel = MiniAxelWorkShop(tmin=tmin, tmax=tmax, bar=ProgressBar(), log=log)
+    axel = WorkShop(tmin=tmin, tmax=tmax, log=log)
     m3u8 = M3u8Stream(axel=axel, proxy=proxy,log=log)
     fetcher = HttpFetcher()
     start_at = time.time()
     try:
         with open(outfile, 'wb') as fp:
             if url.find('m3u8') > 0 or __is_url_file(url):
-                axel.start()
+                axel.serve()
                 m3u8.recode(url=url, duration=duration, fp=fp, npf=npf, freq=cfg.freq)
             else:
                 fetcher.fetch(url=url, fp=fp)
