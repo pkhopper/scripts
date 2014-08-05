@@ -1,7 +1,9 @@
 [default]
-out_dir =
+outpath =
 retrans = True
-threadnum = 5
+tmin = 5
+tmax = 10
+npf = 5
 log_level = debug
 log_file = ./miniaxel.log
 

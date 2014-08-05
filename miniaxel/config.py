@@ -13,11 +13,11 @@ class MiniAxelConfig(scriptutils.BaseConfig):
 
     def get_ini_attrs(self):
         return {
-            'default|out_dir  |s': None,
+            'default|outpath  |s': None,
             'default|retrans  |b': None,
             'default|tmin     |i': None,
             'default|tmax     |i': None,
-            'default|nthread  |i': None,
+            'default|npf      |i': None,
             'proxy  |enable   |b': None,
             'proxy  |addr     |s': None,
             '       |log      | ': scriptutils.get_log_from_config()

@@ -35,7 +35,7 @@ class UrlTask(threadutil.TaskBase):
         self.headers = headers
         self.__file_mutex = _Lock()
 
-    def makeSubWorks(self):
+    def getSubWorks(self):
         cur_size = 0
         size = self.__get_content_len(self.url)
         clip_ranges = HttpFetcher.div_file(size, self.npf)
@@ -116,9 +116,9 @@ class UrlTask(threadutil.TaskBase):
                             self.__fp.close()
                         os.remove(self.out)
         threadutil.TaskBase.cleanup(self)
+        self.callback(self) # ??????
 
     class HttpDLSubWork(threadutil.WorkBase):
-
         def __init__(self, url, fp, data_range, parent, file_mutex=None,
                      proxy=None, callback=None):
             threadutil.WorkBase.__init__(self)
@@ -143,6 +143,7 @@ class UrlTask(threadutil.TaskBase):
                 try:
                     self.__http_fetcher.fetch(self.url, fp=self.fp, data_range=self.data_range,
                             file_mutex=self.file_mutex, callback=self.__callback)
+                    # log.debug('[HttpDLSubWork] finish, %s', self.url)
                     return
                 except _socket_timeout:
                     self.__retry_count += 1
@@ -159,74 +160,6 @@ class UrlTask(threadutil.TaskBase):
                         self.parent.setError()
                     self.is_err_happen = True
                     raise
-
-
-class MiniAxelWorkShop(threadutil.ThreadBase):
-    def __init__(self, tmin=10, tmax=20, bar=None, retrans=False, log=None):
-        threadutil.ThreadBase.__init__(self, log=log)
-        self.progress_bar = bar
-        self.retrans = retrans
-        self.__buff_urlwks = Queue.Queue()
-        self.__urlwks = []
-        self.__ws = threadutil.WorkShop(tmin=tmin, tmax=tmax, log=log)
-
-    def addUrl(self, url, out, headers=None, npf=5, callback=None):
-        urlwk = UrlTask(url, out=out, headers=headers, npf=npf,
-                        retrans=self.retrans, bar=self.progress_bar,
-                        log=self.log, callback=callback)
-        self.__buff_urlwks.put(urlwk)
-        self.log.debug('[axel] add a work: %s', url)
-
-
-    def addUrlWorks(self, works):
-        for wk in works:
-            self.addUrlWork(wk)
-
-    def addUrlWork(self, wk):
-        assert isinstance(wk, UrlTask)
-        wk.setProgressBar(self.progress_bar)
-        self.__buff_urlwks.put(wk)
-        self.log.debug('[axel] add a work: %s', wk.url)
-
-    def run(self):
-        self.log.debug('[axel] start serving')
-        self.__ws.serve()
-        while not self.isSetStop():
-            start_at = _time()
-            try:
-                self.progress_bar.display()
-                if not self.__buff_urlwks.empty():
-                    urlwk = self.__buff_urlwks.get()
-                    self.__ws.addWorks(urlwk.makeSubWorks())
-                    self.__urlwks.append(urlwk)
-                    self.log.debug('[axel] pop a work: %s', urlwk.url)
-                for i, urlwk in enumerate(self.__urlwks):
-                    if urlwk.isErrorHappen():
-                        self.log.debug('[axel] work err: %s', urlwk.url)
-                        urlwk.setToStop()
-                        urlwk.waitForFinish()
-                    if urlwk.isArchived() or urlwk.isErrorHappen():
-                        urlwk.cleanup()
-                        self.log.debug('[axel] work done: %s', urlwk.url)
-                        del self.__urlwks[i]
-                        break
-            except Exception as e:
-                self.log.exception(e)
-            finally:
-                duration = _time() - start_at
-                if duration < 0.5:
-                    _sleep(0.5)
-
-        self.__cleanUp()
-
-    def __cleanUp(self):
-        self.__ws.setToStop()
-        self.__ws.join()
-        for urlwk in self.__urlwks:
-            urlwk.setToStop()
-            urlwk.waitForFinish()
-            urlwk.cleanup()
-        self.log.debug('[axel] stop serving')
 
 
 class ProgressBar:
@@ -362,10 +295,10 @@ class HistoryFile:
     #
     # def serve(self):
     #     self.axel.start()
-    #     threadutil.WorkShop.serve()
+    #     threadutil.WorkDispatcher.serve()
     #
     # def join(self, timeout=None):
     #     if self.axel.isAlive():
     #         self.axel.setToStop()
     #         self.axel.join(timeout)
-    #     threadutil.WorkShop.join(timeout)
+    #     threadutil.WorkDispatcher.join(timeout)
