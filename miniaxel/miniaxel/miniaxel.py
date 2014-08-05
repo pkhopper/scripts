@@ -5,7 +5,6 @@
 import os
 import sys
 import urllib2
-import Queue
 from io import BytesIO
 from time import time as _time, sleep as _sleep
 from threading import Lock as _Lock
@@ -35,7 +34,7 @@ class UrlTask(threadutil.TaskBase):
         self.headers = headers
         self.__file_mutex = _Lock()
 
-    def getSubWorks(self):
+    def makeSubWorks(self):
         cur_size = 0
         size = self.__get_content_len(self.url)
         clip_ranges = HttpFetcher.div_file(size, self.npf)
@@ -62,14 +61,14 @@ class UrlTask(threadutil.TaskBase):
         if self.progress_bar:
             self.progress_bar.set(total_size=size, cur_size=cur_size)
 
-        self.__subworks = []
+        self.subworks = []
         for clip_range in clip_ranges:
-            work = UrlTask.HttpDLSubWork(
+            work = UrlTask.HttpSubWork(
                 url=self.url, fp=self.__fp, file_mutex=self.__file_mutex,
                 data_range=clip_range, parent=self, proxy=self.proxy, callback=self.update
             )
-            self.__subworks.append(work)
-        return self.__subworks
+            self.subworks.append(work)
+        return self.subworks
 
     def __get_content_len(self, url):
         http = HttpUtil()
@@ -77,17 +76,14 @@ class UrlTask(threadutil.TaskBase):
             http.set_proxy(self.proxy)
         info = http.head(url)
         if 200 <= info.status < 300:
-            return int(info.getheader('Content-Length'))
-        else:
-            resp = http.get_response(url)
-            if 200 <= resp.code < 300:
-                # assert resp.has_header('Accept-Ranges')
-                length = int(resp.headers.get('Content-Length'))
-                resp.close()
-                return length
-
-    def setProgressBar(self, bar):
-        self.progress_bar = bar
+            if info.msg.dict.has_key('Content-Length'):
+                return int(info.getheader('Content-Length'))
+        resp = http.get_response(url)
+        if 200 <= resp.code < 300:
+            # assert resp.has_header('Accept-Ranges')
+            length = int(resp.headers.get('Content-Length'))
+            resp.close()
+            return length
 
     def update(self, offset, size):
         if self.progress_bar:
@@ -116,9 +112,10 @@ class UrlTask(threadutil.TaskBase):
                             self.__fp.close()
                         os.remove(self.out)
         threadutil.TaskBase.cleanup(self)
-        self.callback(self) # ??????
+        if self.callback:
+            self.callback(self) # ??????
 
-    class HttpDLSubWork(threadutil.WorkBase):
+    class HttpSubWork(threadutil.WorkBase):
         def __init__(self, url, fp, data_range, parent, file_mutex=None,
                      proxy=None, callback=None):
             threadutil.WorkBase.__init__(self)
@@ -143,19 +140,19 @@ class UrlTask(threadutil.TaskBase):
                 try:
                     self.__http_fetcher.fetch(self.url, fp=self.fp, data_range=self.data_range,
                             file_mutex=self.file_mutex, callback=self.__callback)
-                    # log.debug('[HttpDLSubWork] finish, %s', self.url)
+                    # log.debug('[HttpSubWork] finish, %s', self.url)
                     return
                 except _socket_timeout:
                     self.__retry_count += 1
                     start_at = self.__http_fetcher.handler.start_at
                     end_at = self.__http_fetcher.handler.end_at
-                    log.debug('[HttpDLSubWork] timeout(%d-[%d,%d])  %s', self.__retry_count,
+                    log.debug('[HttpSubWork] timeout(%d-[%d,%d])  %s', self.__retry_count,
                               start_at, end_at, self.url)
                     _sleep(1)
                 except urllib2.URLError as e:
-                    # log.debug('[HttpDLSubWork] Network not work :(')
-                    log.exception(e)
+                    log.debug('[HttpSubWork] Network not work :( %s', e.message)
                 except Exception as e:
+                    log.exception(e)
                     if self.parent:
                         self.parent.setError()
                     self.is_err_happen = True
@@ -186,7 +183,7 @@ class ProgressBar:
     def update(self, data_size):
         with self.mutex:
             self.curr_size += data_size
-            return
+        self.display()
 
     def display(self, force=False):
         if self.last_updat_at < 1:
@@ -285,9 +282,9 @@ class HistoryFile:
 
     def cleanup(self):
         with self.__mutex:
-            # for (a, b) in self.parts:
-            #     if a < b + 1:
-            #         self.update_file(force=True)
+            for (a, b) in self.parts:
+                if a < b + 1:
+                    self.update_file(force=True)
             if self.txt:
                 if os.path.exists(self.txt):
                     os.remove(self.txt)
