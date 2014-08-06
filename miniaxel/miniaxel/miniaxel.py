@@ -61,11 +61,10 @@ class UrlTask(threadutil.TaskBase):
         if self.progress_bar:
             self.progress_bar.set(total_size=size, cur_size=cur_size)
 
-        self.subworks = []
         for clip_range in clip_ranges:
             work = UrlTask.HttpSubWork(
                 url=self.url, fp=self.__fp, file_mutex=self.__file_mutex,
-                data_range=clip_range, parent=self, proxy=self.proxy, callback=self.update
+                data_range=clip_range, parent=self, proxy=self.proxy, callback=self.__update
             )
             self.subworks.append(work)
         return self.subworks
@@ -85,7 +84,7 @@ class UrlTask(threadutil.TaskBase):
             resp.close()
             return length
 
-    def update(self, offset, size):
+    def __update(self, offset, size):
         if self.progress_bar:
             self.progress_bar.update(size)
         if self.__history_file:
@@ -112,19 +111,16 @@ class UrlTask(threadutil.TaskBase):
                             self.__fp.close()
                         os.remove(self.out)
         threadutil.TaskBase.cleanup(self)
-        if self.callback:
-            self.callback(self) # ??????
 
     class HttpSubWork(threadutil.WorkBase):
         def __init__(self, url, fp, data_range, parent, file_mutex=None,
                      proxy=None, callback=None):
-            threadutil.WorkBase.__init__(self)
+            threadutil.WorkBase.__init__(self, parent=parent)
             self.url = url
             self.fp = fp
             self.data_range = data_range
             self.proxy = proxy
             self.file_mutex = file_mutex
-            self.parent = parent
             self.__callback = callback
             self.__retry_count = 0
             self.__http_fetcher = HttpFetcher()
@@ -132,8 +128,8 @@ class UrlTask(threadutil.TaskBase):
                 self.__http_fetcher.set_proxy(self.proxy)
 
         def setToStop(self):
-            threadutil.WorkBase.setToStop(self)
             self.__http_fetcher.setToStop()
+            threadutil.WorkBase.setToStop(self)
 
         def work(self, this_thread, log):
             while not this_thread.isSetStop() and not self.isSetStop():
@@ -153,9 +149,6 @@ class UrlTask(threadutil.TaskBase):
                     log.debug('[HttpSubWork] Network not work :( %s', e.message)
                 except Exception as e:
                     log.exception(e)
-                    if self.parent:
-                        self.parent.setError()
-                    self.is_err_happen = True
                     raise
 
 
@@ -267,10 +260,10 @@ class HistoryFile:
                     break
 
     def update_file(self, force=False):
-        str = ''
+        if not force and self.buffered < 1048576:  # 1024*1024
+            return
         with self.__mutex:
-            if not force and self.buffered < 1048576:  # 1024*1024
-                return
+            str = ''
             self.buffered = 0
             for (a, b) in self.parts:
                 if a < b + 1:
@@ -289,13 +282,3 @@ class HistoryFile:
                 if os.path.exists(self.txt):
                     os.remove(self.txt)
 
-    #
-    # def serve(self):
-    #     self.axel.start()
-    #     threadutil.WorkDispatcher.serve()
-    #
-    # def join(self, timeout=None):
-    #     if self.axel.isAlive():
-    #         self.axel.setToStop()
-    #         self.axel.join(timeout)
-    #     threadutil.WorkDispatcher.join(timeout)
