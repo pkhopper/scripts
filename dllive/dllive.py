@@ -6,7 +6,6 @@ import time
 from vavava import util as _util
 from vavava.httputil import HttpFetcher
 from vavava.threadutil import WorkShop
-from miniaxel.miniaxel import ProgressBar
 from m3u8stream import M3u8Stream
 
 _util.set_default_utf8()

@@ -60,13 +60,14 @@ def dl_u2b(url, cmdline, proxy, titleformat, cache):
 
 class VUrlTask(TaskBase):
     def __init__(self, url, vidfmt, npf, outpath, bar=None, log=None):
-        TaskBase.__init__(self, log=log, callback=None)
+        TaskBase.__init__(self, log=log)
         self.url = url
         self.vidfmt = vidfmt
         self.npf = npf
         self.bar = bar
         self.outpath = outpath
         self.targetfiles = []
+        self.__subtasks = []
 
     def makeSubWorks(self):
         urls, npf, headers = \
@@ -81,13 +82,14 @@ class VUrlTask(TaskBase):
         self.log.debug('[VUrlTask] OUT FILE: %s', self.outname)
         self.log.debug('[VUrlTask] TMP DIR: %s', self.tmpdir)
         self.__makeSubWorks(urls, headers, npf)
-        if len(self.getSubTasks()) == 0:
+        if len(self.__subtasks) == 0:
             self.cleanup()
             return
-        for tsk in self.getSubTasks():
-            for wk in tsk.makeSubWorks():
-                self.subworks.append(wk)
-        return self.subworks
+        subworks = []
+        for tsk in self.__subtasks:
+            for wk in tsk.getSubWorks():
+                subworks.append(wk)
+        return subworks
 
     def parse_url(self, url, vidfmt, npf, outpath):
         parser = parsers.getVidPageParser(self.url)
@@ -104,32 +106,31 @@ class VUrlTask(TaskBase):
 
     def __makeSubWorks(self, urls, headers, npf):
         self.targetfiles = []
-        self.name_map = dict()
+        # self.name_map = dict()
         for i, url in enumerate(urls):
             assert url.strip().startswith('http')
-            tmpfile = pjoin(self.tmpdir, 'tmp_%d_%d.downloading.%s' % (len(urls), i+1, self.ext))
+            # tmpfile = pjoin(self.tmpdir, 'tmp_%d_%d.downloading.%s' % (len(urls), i+1, self.ext))
             tgtfile = pjoin(self.tmpdir, 'tmp_%d_%d.%s' % (len(urls), i+1, self.ext))
-            self.name_map[tmpfile] = tgtfile
+            # self.name_map[tmpfile] = tgtfile
             self.targetfiles.append(tgtfile)
             if pexists(tgtfile):
-                self.log.debug('[VUrlTask] clip file exists: %s', tmpfile)
+                self.log.debug('[VUrlTask] clip file exists: %s', tgtfile)
                 continue
-            subtask = UrlTask(url, out=tmpfile, bar=self.bar, retrans=True,
+            subtask = UrlTask(url, out=tgtfile, bar=self.bar, retrans=True,
                             headers=headers, npf=npf, log=self.log)
-            self.addSubTask(subtask)
+            self.__subtasks.append(subtask)
 
     def cleanup(self):
         wknum = len(self.targetfiles)
         if wknum < 1:
             return
-        count = wknum - len(self.getSubTasks())
-        for i, subtsk in enumerate(self.getSubTasks()):
+        count = wknum - len(self.__subtasks)
+        for i, subtsk in enumerate(self.__subtasks):
             subtsk.cleanup()
             if subtsk.isArchived():
                 count += 1
-                os.rename(subtsk.out, self.name_map[subtsk.out])
-                self.log.debug('[VUrlTask] clip complete (%d/%d): %s',
-                               count, wknum, subtsk.out)
+                # os.rename(subtsk.out, self.name_map[subtsk.out])
+                self.log.debug('[VUrlTask] clip complete (%d/%d): %s', count, wknum, subtsk.out)
         if count != wknum:
             self.log.info('[VUrlTask] not complete: %s', self.outname)
             return
@@ -140,7 +141,6 @@ class VUrlTask(TaskBase):
         if pexists(self.tmpdir):
             os.removedirs(self.tmpdir)
         self.log.error('[VUrlTask] complete: %s', self.outname)
-        TaskBase.cleanup(self)
 
     def __merge(self):
         if len(self.targetfiles) == 1:
@@ -178,7 +178,7 @@ def main():
         while len(dlvs) > 0:
             for i, dlv in enumerate(dlvs):
                 if dlv.isArchived() or dlv.isError():
-                    dlvs[i].cleanup()
+                    # dlvs[i].cleanup()
                     del dlvs[i]
             _sleep(1)
     except Exception as e:

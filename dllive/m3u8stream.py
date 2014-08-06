@@ -109,32 +109,32 @@ class M3u8Stream(ThreadBase):
                 self.__axel.addTask(urltask)
                 self.__urltsks_q.put(urltask)
 
-    def __get_curr_index(self):
-        clips = []
+    def __get_curr_index(self, n=3):
+        urls = []
         targetduration = 0
         try:
             url_base = M3u8Stream.host_filter(self.m3u8url)
             m3u8 = self.__http.get(self.m3u8url)
             uris = m3u8.splitlines(False)
             uris = [uri.strip(' \n') for uri in uris if uri.strip(' \n') != '']
-            for url in uris:
-                if not url.startswith('#'):
-                    if not url.startswith('http'):
-                        url = urllib.basejoin(url_base, url)
-                    if url.endswith('.m3u8'):
-                        self.m3u8url = url
-                        return self.__get_curr_index()
-                    clips.append(url)
-                elif url.lower().find('targetduration') > 0:
+            tags = [uri for uri in uris if uri.startswith('#')]
+            urls = [url for url in uris if not url.startswith('#')]
+            if not urls[0].startswith('http'):
+                urls = [urllib.basejoin(url_base, url) for url in urls]
+            for tag in tags:
+                if url.lower().find('targetduration') > 0:
                     targetduration = int(url.split(':')[1])
                     self.log.debug('targetduration=%d', targetduration)
+            if urls[0].endswith('.m3u8'):
+                self.m3u8url = urls[-1:][0]
+                return self.__get_curr_index()
         except urllib2.URLError as e:
             self.log.warn('network not working: %s', e.message)
         except _socket_timeout:
             self.log.warn('connection timeout')
         except:
             raise
-        return clips, targetduration
+        return urls, targetduration
 
     @staticmethod
     def host_filter(url):
