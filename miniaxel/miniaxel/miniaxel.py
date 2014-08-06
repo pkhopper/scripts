@@ -21,53 +21,58 @@ pabspath = os.path.abspath
 
 
 class UrlTask(threadutil.TaskBase):
-    def __init__(self, url, out, npf=1, proxy=None, bar=None, retrans=False,
-                 headers=None, log=None, callback=None):
-        threadutil.TaskBase.__init__(self, log=log, callback=callback)
+    def __init__(self, url, out, npf=1, headers=None, proxy=None,
+                 bar=None, retrans=False, log=None, callback=None):
+        threadutil.TaskBase.__init__(self, log=log)
         self.url = url
         self.out = out
+        self.tmp_file = ''
         self.npf = npf
         self.proxy = proxy
         self.progress_bar = bar
-        self.retransmission = retrans
+        self.retrans = retrans
         self.__history_file = None
         self.headers = headers
         self.__file_mutex = _Lock()
 
     def makeSubWorks(self):
-        cur_size = 0
+        curr_size = 0
         size = self.__get_content_len(self.url)
         clip_ranges = HttpFetcher.div_file(size, self.npf)
 
         if isinstance(self.out, file) or isinstance(self.out, BytesIO):
             self.__fp = self.out
-            self.retransmission = False
-        elif os.path.exists(self.out):
-            self.__fp = open(self.out, 'rb+')
+            self.retrans = False
         else:
-            self.__fp = open(self.out, 'wb')
+            self.tmp_file = self.out + '!'
+            if os.path.exists(self.tmp_file):
+                self.__fp = open(self.tmp_file, 'rb+')
+            else:
+                self.__fp = open(self.tmp_file, 'wb')
 
-        if size and self.retransmission:
+        if size and self.retrans:
             self.__history_file = HistoryFile()
-            clip_ranges, cur_size = self.__history_file.mk_clips(self.out, clip_ranges, size)
+            clip_ranges, curr_size = self.__history_file.mk_clips(
+                self.tmp_file, clip_ranges, size)
 
         # can not retransmission
         if clip_ranges is None or size is None or size == 0:
-            self.retransmission = False
+            self.retrans = False
             self.log.debug('[DownloadUrl] can not retransmission, %s', self.url)
             clip_ranges = [None]
             size = 0
 
         if self.progress_bar:
-            self.progress_bar.set(total_size=size, cur_size=cur_size)
+            self.progress_bar.set(total_size=size, curr_size=curr_size)
 
+        subworks = []
         for clip_range in clip_ranges:
             work = UrlTask.HttpSubWork(
                 url=self.url, fp=self.__fp, file_mutex=self.__file_mutex,
                 data_range=clip_range, parent=self, proxy=self.proxy, callback=self.__update
             )
-            self.subworks.append(work)
-        return self.subworks
+            subworks.append(work)
+        return subworks
 
     def __get_content_len(self, url):
         http = HttpUtil()
@@ -95,22 +100,19 @@ class UrlTask(threadutil.TaskBase):
             self.progress_bar.display(force)
 
     def cleanup(self):
-        if self.progress_bar:
-            self.progress_bar.display(force=True)
-        if self.retransmission:
+        is_inter_file = not (isinstance(self.out, BytesIO) or isinstance(self.out, file))
+        if self.isArchived():
+            if is_inter_file:
+                os.rename(self.tmp_file, self.out)
+        elif not self.retrans and is_inter_file:
+            if not self.__fp.closed:
+                self.__fp.close()
+            os.remove(self.tmp_file)
+        if self.retrans:
             if self.__history_file:
                 self.__history_file.cleanup()
-        else:
-            # del unfinished file
-            if not self.isArchived():
-                is_external_file = isinstance(self.out, BytesIO) \
-                                   or isinstance(self.out, file)
-                if not is_external_file:
-                    if os.path.exists(self.out):
-                        if self.__fp and self.__fp.closed:
-                            self.__fp.close()
-                        os.remove(self.out)
-        threadutil.TaskBase.cleanup(self)
+        if self.progress_bar:
+            self.progress_bar.display(force=True)
 
     class HttpSubWork(threadutil.WorkBase):
         def __init__(self, url, fp, data_range, parent, file_mutex=None,
@@ -163,11 +165,11 @@ class ProgressBar:
         self.start_at = 0
         self.sub_bar_count = 0
 
-    def set(self, total_size, cur_size):
+    def set(self, total_size, curr_size):
         with self.mutex:
             self.sub_bar_count += 1
             self.total_size += total_size
-            self.curr_size += cur_size
+            self.curr_size += curr_size
             self.last_updat_at = _time()
             self.last_size = self.curr_size
             if self.start_at == 0:
@@ -216,18 +218,19 @@ class ProgressBar:
 class HistoryFile:
     def __init__(self):
         self.__mutex = _Lock()
-        self.txt = None
+        self.hfile = None
+        self.__fp = None
 
     def mk_clips(self, target_file, parts, size):
         """ return clips, current_size, is_retransmission
         """
-        self.target_file = os.path.abspath(target_file)
-        self.txt = self.target_file + '.txt'
+        self.target = os.path.abspath(target_file)
+        self.hfile = self.target + '.cfg'
         self.buffered = 0
         cur_size = size
-        if os.path.exists(self.txt) and os.path.exists(self.target_file):
+        if os.path.exists(self.hfile) and os.path.exists(self.target):
             self.parts = []
-            with open(self.txt, 'r') as fp:
+            with open(self.hfile, 'r') as fp:
                 for num in fp.read().split('|'):
                     if num.strip() != '':
                         (a, b) = num.split(',')
@@ -235,15 +238,16 @@ class HistoryFile:
                         if a <= b:
                             cur_size -= b - a + 1
                             self.parts.append((a, b))
+            self.__fp = open(self.hfile, 'w')
             return self.parts, cur_size
         else:
             if parts is None:
                 self.parts = [(0, size - 1)]
             else:
                 self.parts = parts
-            with open(self.txt, 'w') as fp:
-                for clip in self.parts:
-                    fp.write('%d,%d|' % clip)
+            self.__fp = open(self.hfile, 'w')
+            for p in self.parts:
+                self.__fp.write('%d,%d|' % p)
             return parts, 0
 
     def update(self, offset, size):
@@ -270,15 +274,16 @@ class HistoryFile:
                     str += '%d,%d|' % (a, b)
                 else:
                     assert a <= (b + 1)
-        with open(self.txt, 'w') as fp:
-            fp.write(str)
+        self.__fp.write(str)
 
     def cleanup(self):
         with self.__mutex:
             for (a, b) in self.parts:
                 if a < b + 1:
                     self.update_file(force=True)
-            if self.txt:
-                if os.path.exists(self.txt):
-                    os.remove(self.txt)
+            if self.hfile:
+                if not self.__fp.closed:
+                    self.__fp.close()
+                if os.path.exists(self.hfile):
+                    os.remove(self.hfile)
 
