@@ -102,7 +102,7 @@ class UrlTask(threadutil.TaskBase):
     def cleanup(self):
         is_inter_file = not (isinstance(self.out, BytesIO) or isinstance(self.out, file))
         if self.isArchived():
-            if is_inter_file:
+            if is_inter_file and os.path.exists(self.tmp_file):
                 os.rename(self.tmp_file, self.out)
         elif not self.retrans and is_inter_file:
             if not self.__fp.closed:
@@ -277,13 +277,14 @@ class HistoryFile:
         self.__fp.write(str)
 
     def cleanup(self):
+        finished = True
         with self.__mutex:
             for (a, b) in self.parts:
                 if a < b + 1:
                     self.update_file(force=True)
+                    finished = False
             if self.hfile:
                 if not self.__fp.closed:
                     self.__fp.close()
-                if os.path.exists(self.hfile):
-                    os.remove(self.hfile)
-
+            if finished and os.path.exists(self.hfile):
+                os.remove(self.hfile)

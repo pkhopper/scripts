@@ -8,6 +8,11 @@ def r1(pattern, text, flag=0):
     if m:
         return m.group(1)
 
+def r0(pattern, text, flag=0):
+    m = re.search(pattern, text, flag)
+    if m:
+        return m.group(0)
+
 def unescape_html(html):
     import xml.sax.saxutils
     html = xml.sax.saxutils.unescape(html)

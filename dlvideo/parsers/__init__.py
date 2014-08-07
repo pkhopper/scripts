@@ -9,6 +9,7 @@ import w56
 import iqiyi
 import youku
 import flvcd
+import yytingting
 
 def getVidPageParser(url):
     if url.find('sohu.com') > 0:
@@ -19,6 +20,8 @@ def getVidPageParser(url):
         return w56.W56()
     elif url.find('iqiyi.com') > 0:
         return iqiyi.Iqiyi()
+    elif url.find('yytingting.com') > 0:
+        return yytingting.Yytingting()
     else:
         return flvcd.FLVCD()
 

@@ -302,8 +302,14 @@ def concat_flvs(flvs, output=None):
 
     print 'Joining %s into %s' % (', '.join(flvs), output)
     ins = [open(flv, 'rb') for flv in flvs]
+    check_msg = dict()
     for stream in ins:
-        read_flv_header(stream)
+        try:
+            read_flv_header(stream)
+        except Exception as e:
+            check_msg[stream.name] = e
+    if len(check_msg) > 0:
+        raise ValueError('not flv file: {}'.format(check_msg))
     meta_tags = map(read_tag, ins)
     metas = map(read_meta_tag, meta_tags)
     meta_types, metas = zip(*metas)
@@ -321,6 +327,7 @@ def concat_flvs(flvs, output=None):
     write_meta_tag(out, meta_type, meta_data)
     timestamp_start = 0
     for stream in ins:
+        print 'working on stream: ', stream.name
         while True:
             tag = read_tag(stream)
             if tag:

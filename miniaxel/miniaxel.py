@@ -72,6 +72,11 @@ def mainTest(axel, bar, log):
             # mTestFunc(axel, url, md5, n, log)
             log.debug('add a test work: %s,%s,%d', url, md5, n)
 
+def interface(cmd):
+    if cmd.startswith('http'):
+        return None, cmd
+    name, url = cmd.split(',')
+    return name, url
 
 def usage():
     return """
@@ -112,8 +117,11 @@ def main(argv):
             elif cmd in('test'):
                 mainTest(axel, bar, log)
             else:
-                url = cmd
-                name = pjoin(cfg.outpath, find_name(url))
+                name, url = interface(cmd)
+                if name:
+                    name = pjoin(cfg.outpath, name)
+                else:
+                    name = pjoin(cfg.outpath, find_name(url))
                 urltask = UrlTask(url, out=name, npf=cfg.npf, bar=bar, retrans=True, log=cfg.log)
                 axel.addTask(urltask)
     except KeyboardInterrupt as e:

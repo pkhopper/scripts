@@ -122,9 +122,10 @@ class M3u8Stream(ThreadBase):
             if not urls[0].startswith('http'):
                 urls = [urllib.basejoin(url_base, url) for url in urls]
             for tag in tags:
-                if url.lower().find('targetduration') > 0:
-                    targetduration = int(url.split(':')[1])
+                if tag.lower().find('targetduration') > 0:
+                    targetduration = int(tag.split(':')[1])
                     self.log.debug('targetduration=%d', targetduration)
+                    break
             if urls[0].endswith('.m3u8'):
                 self.m3u8url = urls[-1:][0]
                 return self.__get_curr_index()

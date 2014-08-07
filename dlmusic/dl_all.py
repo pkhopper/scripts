@@ -18,7 +18,7 @@ abspath = os.path.abspath
 user_path = os.environ['HOME']
 
 class Config:
-    def __init__(self, config='config.ini'):
+    def __init__(self, config='miniaxel.ini'):
         dump_path = lambda path: path.replace(r"%(home)s", user_path)
         if os.path.islink(__file__):
             curr_dir = dirname(abspath(os.readlink(__file__)))

@@ -160,10 +160,11 @@ class VUrlTask(TaskBase):
 
 def main():
     urls = [
-        'http://i.youku.com/u/UNTc4NzI3MjY0',
+        'http://v.youku.com/v_show/id_XNzUyNDE4MTQw.html'
+        # 'http://i.youku.com/u/UNTc4NzI3MjY0',
         # 'http://v.youku.com/v_show/id_XNzQ5NDAwMDIw.html?from=y1.1-2.10001-0.1-1',
-        'http://v.youku.com/v_show/id_XNzUwMTE2MDQw.html?f=22611771',
-        'http://v.youku.com/v_show/id_XNzQ3MjMxMTYw.html'
+        # 'http://v.youku.com/v_show/id_XNzUwMTE2MDQw.html?f=22611771',
+        # 'http://v.youku.com/v_show/id_XNzQ3MjMxMTYw.html'
     ]
     log = util.get_logger()
     bar = ProgressBar()
@@ -181,6 +182,8 @@ def main():
                     # dlvs[i].cleanup()
                     del dlvs[i]
             _sleep(1)
+    except KeyboardInterrupt:
+        pass
     except Exception as e:
         log.exception(e)
     finally:
