@@ -66,6 +66,9 @@ class VUrlTask(TaskBase):
         self.npf = npf
         self.bar = bar
         self.outpath = outpath
+        self.__task_history = None
+        self.tmpdir = None
+        self.outname = None
         self.targetfiles = []
         self.__subtasks = []
 
@@ -79,6 +82,8 @@ class VUrlTask(TaskBase):
             self.log.info('[VUrlTask] out put file exists, %s', self.outname)
             return
         util.assure_path(self.tmpdir)
+        with open(self.__task_history, 'w') as fp:
+            fp.write(self.url)
         self.log.debug('[VUrlTask] OUT FILE: %s', self.outname)
         self.log.debug('[VUrlTask] TMP DIR: %s', self.tmpdir)
         self.__makeSubWorks(urls, headers, npf)
@@ -102,19 +107,17 @@ class VUrlTask(TaskBase):
         title = to_native_string(title)
         self.outname = pjoin(self.outpath, '%s.%s' % (title, self.ext))
         self.tmpdir = pjoin(self.outpath, escape_file_path(title) + '.downloading')
+        self.__task_history = pjoin(self.tmpdir, 'url.txt')
         return urls, npf, headers
 
     def __makeSubWorks(self, urls, headers, npf):
         self.targetfiles = []
-        # self.name_map = dict()
         for i, url in enumerate(urls):
             assert url.strip().startswith('http')
-            # tmpfile = pjoin(self.tmpdir, 'tmp_%d_%d.downloading.%s' % (len(urls), i+1, self.ext))
             tgtfile = pjoin(self.tmpdir, 'tmp_%d_%d.%s' % (len(urls), i+1, self.ext))
-            # self.name_map[tmpfile] = tgtfile
             self.targetfiles.append(tgtfile)
             if pexists(tgtfile):
-                self.log.debug('[VUrlTask] clip file exists: %s', tgtfile)
+                self.log.debug('[VUrlTask] sub file exists: %s', tgtfile)
                 continue
             subtask = UrlTask(url, out=tgtfile, bar=self.bar, retrans=True,
                             headers=headers, npf=npf, log=self.log)
@@ -129,7 +132,6 @@ class VUrlTask(TaskBase):
             subtsk.cleanup()
             if subtsk.isArchived():
                 count += 1
-                # os.rename(subtsk.out, self.name_map[subtsk.out])
                 self.log.debug('[VUrlTask] clip complete (%d/%d): %s', count, wknum, subtsk.out)
         if count != wknum:
             self.log.info('[VUrlTask] not complete: %s', self.outname)
@@ -138,6 +140,8 @@ class VUrlTask(TaskBase):
         for f in self.targetfiles:
             if pexists(f):
                 os.remove(f)
+        if pexists(self.__task_history):
+            os.remove(self.__task_history)
         if pexists(self.tmpdir):
             os.removedirs(self.tmpdir)
         self.log.error('[VUrlTask] complete: %s', self.outname)
@@ -160,15 +164,15 @@ class VUrlTask(TaskBase):
 
 def main():
     urls = [
-        'http://v.youku.com/v_show/id_XNzUyNDE4MTQw.html'
+        # 'http://v.youku.com/v_show/id_XNzUyNDE4MTQw.html'
         # 'http://i.youku.com/u/UNTc4NzI3MjY0',
         # 'http://v.youku.com/v_show/id_XNzQ5NDAwMDIw.html?from=y1.1-2.10001-0.1-1',
         # 'http://v.youku.com/v_show/id_XNzUwMTE2MDQw.html?f=22611771',
-        # 'http://v.youku.com/v_show/id_XNzQ3MjMxMTYw.html'
+        'http://v.youku.com/v_show/id_XNzQ3MjMxMTYw.html'
     ]
     log = util.get_logger()
     bar = ProgressBar()
-    ws = WorkShop(tmin=5, tmax=10, log=log)
+    ws = WorkShop(tmin=1, tmax=2, log=log)
     dlvs = []
     for i, url in enumerate(urls):
         dlvideo = VUrlTask(url, 0, 3, './tmp', bar=bar, log=log)
@@ -182,6 +186,7 @@ def main():
                     # dlvs[i].cleanup()
                     del dlvs[i]
             _sleep(1)
+        # _sleep(2)
     except KeyboardInterrupt:
         pass
     except Exception as e:
@@ -193,3 +198,11 @@ def main():
 
 if __name__ == '__main__':
     main()
+    print '============== check'
+    name = './tmp/小姜老师课堂.flv'
+    with open(name, 'r') as fp:
+        mm = util.md5_for_file(fp)
+        print mm
+        assert '8d3f6b0d51f0c2532e82dba9c6c933a4' == mm
+    os.remove(name)
+    os.rmdir('./tmp')
