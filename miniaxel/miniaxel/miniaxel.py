@@ -298,7 +298,6 @@ class HistoryFile:
                 if a < b + 1:
                     finished = False
             if not finished:
-                print self.parts
                 self.update_file(force=True)
             # if self.hfile:
             #     if not self.__fp.closed:
