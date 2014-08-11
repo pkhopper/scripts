@@ -41,12 +41,13 @@ class DLVideoConfig(scriptutils.BaseConfig):
         parser.add_argument('-m', '--dlmethod')
         parser.add_argument('-i', '--interact', action='store_true', default=False)
         parser.add_argument('-l', '--playlist', action='store_true', default=False)
-        parser.add_argument('-f', '--format', type=int, help='[0,3]',choices=[0, 1, 2, 3])
+        parser.add_argument('-f', '--vidfmt', type=int, help='[0,3]',choices=[0, 1, 2, 3])
         result = parser.parse_args()
         return result
 
 if __name__ == "__main__":
     import sys
+    sys.argv = ['cmd', '-f', '0', 'http://v.youku.com/v_show/id_XNzMyMzM1OTg4.html']
     cfg = DLVideoConfig()
-    cfg.read_cmdline_config('dlvideo.ini', argv=sys.argv)
+    cfg.read_cmdline_config('dlvideo.ini', script=__file__, argv=sys.argv)
     print cfg

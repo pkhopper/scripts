@@ -56,3 +56,7 @@ class SohuPlaylist(PlayListFilterBase):
         items = [video['pageUrl'] for video in data['videos']]
         return title, items
 
+if __name__ == "__main__":
+    url = "http://my.tv.sohu.com/us/42891366/72351551.shtml"
+    info = Sohu().info(url, vidfmt=0)
+    print info
