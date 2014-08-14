@@ -72,7 +72,7 @@ def mainTest(axel, bar, log):
             # mTestFunc(axel, url, md5, n, log)
             log.debug('add a test work: %s,%s,%d', url, md5, n)
 
-def interface(cmd):
+def process_cmd(cmd):
     if cmd.startswith('http'):
         return None, cmd
     name, url = cmd.split(',')
@@ -117,7 +117,7 @@ def main(argv):
             elif cmd in('test'):
                 mainTest(axel, bar, log)
             else:
-                name, url = interface(cmd)
+                name, url = process_cmd(cmd)
                 if name:
                     name = pjoin(cfg.outpath, name)
                 else:

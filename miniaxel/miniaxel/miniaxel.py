@@ -5,7 +5,6 @@
 import os
 import sys
 import urllib2
-from io import BytesIO
 from time import time as _time, sleep as _sleep
 from threading import RLock as _RLock
 from socket import timeout as _socket_timeout
@@ -30,7 +29,7 @@ class UrlTask(threadutil.TaskBase):
         self.npf = npf
         self.proxy = proxy
         self.progress_bar = bar
-        self.__is_inter_file = False
+        self.__is_inter_file = isinstance(self.out, str)
         self.retrans = retrans
         self.__history_file = None
         self.headers = headers
@@ -41,12 +40,10 @@ class UrlTask(threadutil.TaskBase):
         size = self.__get_content_len(self.url)
         clip_ranges = HttpFetcher.div_file(size, self.npf)
 
-        if isinstance(self.out, file) or isinstance(self.out, BytesIO):
-            self.__is_inter_file = False
+        if not self.__is_inter_file:
             self.__fp = self.out
             self.retrans = False
         else:
-            self.__is_inter_file = True
             self.tmp_file = self.out + '!'
             if os.path.exists(self.tmp_file):
                 self.__fp = open(self.tmp_file, 'rb+')
@@ -55,7 +52,7 @@ class UrlTask(threadutil.TaskBase):
 
         if size and self.retrans:
             self.__history_file = HistoryFile()
-            clip_ranges, curr_size = self.__history_file.mk_clips(
+            clip_ranges, curr_size = self.__history_file.load(
                 self.tmp_file, clip_ranges, size)
 
         # can not retransmission
@@ -169,6 +166,7 @@ class ProgressBar:
         self.last_updat_at = 0
         self.start_at = 0
         self.sub_bar_count = 0
+        self.__echo_bak = self.echo
 
     def set(self, total_size, curr_size):
         with self.mutex:
@@ -198,27 +196,34 @@ class ProgressBar:
             speed = 0
         else:
             speed = (self.curr_size - self.last_size)/duration
-        output_format = '\r[%d][%3.1d%% %5.1dk/s][ %5.1ds/%5.1ds] [%dk/%dk]            '
+        output_format = '[%d][%3.1d%% %5.1dk/s][%2dm%2ds/%2dm%2ds] [%dk/%dk]            '
         if speed > 0:
+            past = now - self.start_at
+            last = (self.total_size-self.curr_size)/speed
             output = output_format % (self.sub_bar_count, percentage*10, speed/1024,
-                                      now - self.start_at, (self.total_size-self.curr_size)/speed,
+                                      past/60, past%60, last/60, last%60,
                                       self.curr_size/1024, self.total_size/1024)
         else:
             if self.curr_size == 0:
                 expect = 0
             else:
                 expect = (self.total_size-self.curr_size)*(now-self.start_at)/self.curr_size
-            output = output_format % (self.sub_bar_count, percentage*10, 0, now - self.start_at,
-                                      expect, self.curr_size/1024, self.total_size/1024)
-        sys.stdout.write(output)
-        if percentage == 100:
-            sys.stdout.write('\n')
-        sys.stdout.flush()
+                past = now - self.start_at
+            output = output_format % (self.sub_bar_count, percentage*10, 0,
+                                      past/60, past%60, expect/60, expect%60,
+                                      self.curr_size/1024, self.total_size/1024)
+        self.echo(output)
         self.last_updat_at = now
         self.last_size = self.curr_size
-        # if force and percentage == 10:
-        #     print ''
 
+    def echo(self, msg):
+        sys.stdout.write('\r' + msg)
+        # if percentage == 100:
+        #     sys.stdout.write('\n')
+        sys.stdout.flush()
+
+    def recover_echo(self, caller):
+        self.echo = self.__echo_bak
 
 class HistoryFile:
     def __init__(self):
@@ -226,7 +231,7 @@ class HistoryFile:
         self.hfile = None
         # self.__fp = None
 
-    def mk_clips(self, target_file, parts, size):
+    def load(self, target_file, parts, size):
         """ return clips, current_size, is_retransmission
         """
         self.target = os.path.abspath(target_file)

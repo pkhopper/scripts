@@ -81,12 +81,13 @@ class VUrlTask(TaskBase):
         if pexists(self.outname):
             self.log.info('[VUrlTask] out put file exists, %s', self.outname)
             return
+
         util.assure_path(self.tmpdir)
         with open(self.__task_history, 'w') as fp:
             fp.write(self.url)
         self.log.debug('[VUrlTask] OUT FILE: %s', self.outname)
         self.log.debug('[VUrlTask] TMP DIR: %s', self.tmpdir)
-        self.__makeSubWorks(urls, headers, npf)
+        self.__makeSubTasks(urls, headers, npf)
         if len(self.__subtasks) == 0:
             self.cleanup()
             return
@@ -110,7 +111,7 @@ class VUrlTask(TaskBase):
         self.__task_history = pjoin(self.tmpdir, 'url.txt')
         return urls, npf, headers
 
-    def __makeSubWorks(self, urls, headers, npf):
+    def __makeSubTasks(self, urls, headers, npf):
         self.targetfiles = []
         for i, url in enumerate(urls):
             assert url.strip().startswith('http')
@@ -136,7 +137,7 @@ class VUrlTask(TaskBase):
         if count != wknum:
             self.log.info('[VUrlTask] not complete: %s', self.outname)
             return
-        self.__merge()
+        self.__merge(self.targetfiles, self.outname, self.ext)
         for f in self.targetfiles:
             if pexists(f):
                 os.remove(f)
@@ -146,20 +147,20 @@ class VUrlTask(TaskBase):
             os.removedirs(self.tmpdir)
         self.log.error('[VUrlTask] complete: %s', self.outname)
 
-    def __merge(self):
-        if len(self.targetfiles) == 1:
-            os.rename(self.targetfiles[0], self.outname)
+    def __merge(self, files, outname, ext):
+        if len(files) == 1:
+            os.rename(files[0], outname)
             return
-        if self.ext == 'flv':
+        if ext == 'flv':
             from flv_join import concat_flvs
             concat = concat_flvs
-        elif self.ext == 'mp4':
+        elif ext == 'mp4':
             from mp4_join import concat_mp4s
             concat = concat_mp4s
         else:
-            self.log.error("[VUrlTask] merge failed: {}".format(self.targetfiles))
+            self.log.error("[VUrlTask] merge failed: {}".format(files))
             return
-        concat(self.targetfiles, self.outname)
+        concat(files, outname)
 
 
 def main():
@@ -183,10 +184,8 @@ def main():
         while len(dlvs) > 0:
             for i, dlv in enumerate(dlvs):
                 if dlv.isArchived() or dlv.isError():
-                    # dlvs[i].cleanup()
                     del dlvs[i]
             _sleep(1)
-        # _sleep(2)
     except KeyboardInterrupt:
         pass
     except Exception as e:
@@ -194,7 +193,7 @@ def main():
     finally:
         ws.setToStop()
         ws.join()
-        print 'ok >>>>>>>>>>>>>>>>>>>>>>>>>'
+
 
 if __name__ == '__main__':
     main()
