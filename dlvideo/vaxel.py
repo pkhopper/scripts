@@ -169,7 +169,8 @@ def main():
         # 'http://i.youku.com/u/UNTc4NzI3MjY0',
         # 'http://v.youku.com/v_show/id_XNzQ5NDAwMDIw.html?from=y1.1-2.10001-0.1-1',
         # 'http://v.youku.com/v_show/id_XNzUwMTE2MDQw.html?f=22611771',
-        'http://v.youku.com/v_show/id_XNzQ3MjMxMTYw.html'
+        # 'http://v.youku.com/v_show/id_XNzQ3MjMxMTYw.html',
+        'http://video.sina.com.cn/p/ent/v/m/2014-08-14/102164094039.html'
     ]
     log = util.get_logger()
     bar = ProgressBar()

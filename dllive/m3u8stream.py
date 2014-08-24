@@ -128,6 +128,7 @@ class M3u8Stream(ThreadBase):
                     break
             if urls[0].endswith('.m3u8'):
                 self.m3u8url = urls[-1:][0]
+                # self.m3u8url = urls[0][0]
                 return self.__get_curr_index()
         except urllib2.URLError as e:
             self.log.warn('network not working: %s', e.message)

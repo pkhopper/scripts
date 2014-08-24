@@ -49,7 +49,6 @@ def main(cfg, log):
         while len(dlvs) > 0:
             for i, dlv in enumerate(dlvs):
                 if dlv.isArchived() or dlv.isError():
-                    # dlvs[i].cleanup()
                     del dlvs[i]
             _sleep(1)
     except Exception as e:
@@ -57,6 +56,7 @@ def main(cfg, log):
     finally:
         ws.setToStop()
         ws.join()
+
 
 if __name__ == "__main__":
     cfg = DLVideoConfig().read_cmdline_config('dlvideo.ini', __file__, sys.argv)

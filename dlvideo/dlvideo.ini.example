@@ -1,24 +1,20 @@
 [default]
-out_dir = download
-;0/1/2/3
-format = 0
-log = ./log/dlvideo.log
+outpath = ./
+vidfmt = 2
+log = dlvideo.log
 log_level = debug
-
-[network]
-nthread=10
-nperfile=5
-
-[script]
-cmd =
-lib_dir =
+dlmethod = wget
+; n parts per file
+npf=5
+tmin=5
+tmax=8
 
 [u2b]
-cmd =
-proxy =
-cache = .u2cache
-title_format = %(title)s-%(id)s.%(ext)s
-create_dir = false
+u2b_cmd =
+u2b_proxy =
+u2b_cache = .u2cache
+u2b_create_dir = false
+u2b_title_format = %(title)s-%(id)s.%(ext)s
 
 [flvcd]
 default = true
@@ -26,6 +22,4 @@ sohu.com = false
 youku.com = true
 56.com = false
 tudou.com = false
-
-[filter]
-tudou.com = {'Referer': 'http://js.tudouui.com/bin/lingtong/PortalPlayer_108.swf',}
+iqiyi.com = false

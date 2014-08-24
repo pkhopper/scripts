@@ -2,7 +2,6 @@
 # coding=utf-8
 
 from bs4 import BeautifulSoup
-
 from base_types import PlayListFilterBase
 from vavava.httputil import HttpUtil
 

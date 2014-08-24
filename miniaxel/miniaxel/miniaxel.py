@@ -70,7 +70,7 @@ class UrlTask(threadutil.TaskBase):
         for clip_range in clip_ranges:
             work = UrlTask.HttpSubWork(
                 url=self.url, fp=syn_file, data_range=clip_range, parent=self,
-                proxy=self.proxy, callback=self.__update, log=self.log
+                headers=self.headers, proxy=self.proxy, callback=self.__update, log=self.log
             )
             subworks.append(work)
         return subworks
@@ -83,7 +83,11 @@ class UrlTask(threadutil.TaskBase):
         if 200 <= info.status < 300:
             if info.msg.dict.has_key('Content-Length'):
                 return int(info.getheader('Content-Length'))
-        resp = http.get_response(url)
+        try:
+            resp = http.get_response(url)
+        except urllib2.URLError as e:
+            self.log.warn('%s \n %s', e.reason, url)
+            return 0
         if 200 <= resp.code < 300:
             # assert resp.has_header('Accept-Ranges')
             length = int(resp.headers.get('Content-Length'))
@@ -119,13 +123,14 @@ class UrlTask(threadutil.TaskBase):
             self.__callback(self)
 
     class HttpSubWork(threadutil.WorkBase):
-        def __init__(self, url, fp, data_range, parent,
+        def __init__(self, url, fp, data_range, parent, headers=None,
                      proxy=None, callback=None, log=None):
             threadutil.WorkBase.__init__(self, parent=parent)
             self.url = url
             self.fp = fp
             self.data_range = data_range
             self.proxy = proxy
+            self.headers = headers
             self.__callback = callback
             self.log = log
             self.__retry_count = 0
@@ -137,6 +142,8 @@ class UrlTask(threadutil.TaskBase):
             isSetStop = lambda : this_thread.isSetStop() or self.isSetStop()
             while not isSetStop():
                 try:
+                    if self.headers:
+                        self.__http_fetcher.add_headers(self.headers)
                     self.__http_fetcher.fetch(
                         self.url, fp=self.fp, data_range=self.data_range,
                         isSetStop=isSetStop, callback=self.__callback
@@ -150,7 +157,7 @@ class UrlTask(threadutil.TaskBase):
                               start_at, end_at, self.url)
                     _sleep(1)
                 except urllib2.URLError as e:
-                    log.debug('[HttpSubWork] Network not work :( %s', e.message)
+                    log.debug('[HttpSubWork] Network not work :( %s', e.reason)
                     _sleep(1)
                 except:
                     raise
@@ -206,6 +213,7 @@ class ProgressBar:
         else:
             if self.curr_size == 0:
                 expect = 0
+                past = 0
             else:
                 expect = (self.total_size-self.curr_size)*(now-self.start_at)/self.curr_size
                 past = now - self.start_at

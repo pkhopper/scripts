@@ -6,6 +6,11 @@ from base_types import VidParserBase
 import vavava.util
 vavava.util.set_default_utf8()
 
+def host_filter(url):
+    # http://video.sina.com.cn/p/ent/v/m/2014-08-14/102164094039.html
+    if url.find('video.sina.com.cn') > 0:
+        return 1, {'Referer': url, 'DNT': '1'}
+    return 3, None
 
 class FLVCD(VidParserBase):
     def info(self, url, vidfmt):
@@ -27,14 +32,12 @@ class FLVCD(VidParserBase):
         except Exception as e:
             # raise ValueError('not support')
             return [], '', None, 0, None
-        urls = [url for url in m3u.split('|')]
-        return urls, title, None, 5, None
+        urls = [u for u in m3u.split('|')]
+        npf, headers = host_filter(url)
+        return urls, title, None, npf, headers
 
 def test():
-    url = r'http://www.iqiyi.com/dianshiju/20120730/9682f22c54d70f29.html'
-    url = r'http://www.tudou.com/programs/view/hVT9-loKZ_M/'
-    url = r'http://v.youku.com/v_show/id_XNzQzNTc0Nzgw.html'
-    url = r'http://v.youku.com/v_show/id_XNzIzNjYxNTMy.html'
+    url = r'http://video.sina.com.cn/p/ent/v/m/2014-08-14/102164094039.html'
     flvcd = FLVCD()
     print flvcd.info(url, 0)
 
