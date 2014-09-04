@@ -11,7 +11,7 @@ user_path = os.environ['HOME']
 import util
 
 class Config:
-    def __init__(self, config='config.ini'):
+    def __init__(self, config='miniaxel.ini'):
         dump_path = lambda path: path.replace(r"%(home)s", user_path)
         if os.path.islink(__file__):
             curr_dir = dirname(abspath(os.readlink(__file__)))
@@ -35,7 +35,7 @@ from snspy import SinaWeiboMixin
 
 class MyWeibo:
     """ http://open.weibo.com/wiki/%E5%BE%AE%E5%8D%9AAPI """
-    def __init__(self, config='config.ini'):
+    def __init__(self, config='miniaxel.ini'):
         self.cfg = Config(config)
 
     def login(self):
@@ -126,7 +126,7 @@ def parse_args():
     usage = """./weibo-top [-h] [-c configfile]"""
     import argparse
     parser=argparse.ArgumentParser(usage=usage, description='top-like weibo', version='0.1')
-    parser.add_argument('-c', '--config', default='config.ini')
+    parser.add_argument('-c', '--config', default='miniaxel.ini')
     args = parser.parse_args()
     print 'args===>{}'.format(args)
     return args
