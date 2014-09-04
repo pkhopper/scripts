@@ -84,7 +84,7 @@ def httpserver_serve(log):
 
 if __name__ == "__main__":
     global gIpScanner
-    log = util.get_logger(logfile='log.txt')
+    log = util.get_logger()
     gIpScanner = IPScanner(log=log)
     try:
         gIpScanner.start()
