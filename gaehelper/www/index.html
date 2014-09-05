@@ -9,14 +9,14 @@
     </style>
 
     <style type="text/css">
-    div#historydiv {width:90%;float:left;border: 1px;}
+    div#averagediv {width:90%;float:left;border: 1px;}
     div#currdiv {width:90%;float:left;border: 1px;}
     </style>
 
     <script type="text/javascript">
         $(document).ready(function() {
             update_tabledata('curr', 'curr');
-            update_tabledata('history', 'history');
+            update_tabledata('average', 'average');
         });
     </script>
 </head>
@@ -26,8 +26,8 @@
     <table id="curr" class="display dataTable">
     </table>
 </div>
-<div id="historydiv">
-    <table id="history" class="display dataTable">
+<div id="averagediv">
+    <table id="average" class="display dataTable">
     </table>
 </div>
 

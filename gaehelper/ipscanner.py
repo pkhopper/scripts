@@ -2,8 +2,8 @@
 # coding=utf-8
 
 import os
-import Queue
 import re
+from threading import RLock as _RLock
 from time import time as _time, sleep as _sleep
 from vavava import httputil
 from vavava import threadutil
@@ -64,29 +64,71 @@ def resolve(host, timeout=1):
 
 
 class IP:
-    def __init__(self, ip, t, country=''):
-        self.ip = ip
-        self.t = t
-        self.country = country
+    def __init__(self, *t_ip_country):
+        self.t, self.ip, self.country = t_ip_country
+        self.t = float(self.t)
 
     def __lt__(self, other):
         return self.t < other.t
 
     def __str__(self):
-        return '{},{},{}'.format(self.ip, self.country, self.t)
+        return '{},{},{}'.format(self.t, self.ip, self.country)
+
+class DataFile:
+    def __init__(self, host, limit, data_path):
+        self.data_path = data_path
+        self.hfile = pjoin(data_path, '{}.log'.format(host))
+        self.afile = pjoin(data_path, '{}.average.log'.format(host))
+        self.limit = limit
+        self.hips = None
+        self.aips = None
+        self.__mutex = _RLock()
+
+    def updateFile(self, ipList):
+        util.assure_path(self.data_path)
+        with self.__mutex:
+            self.hips = self.hList + ipList
+            with open(self.hfile, 'w') as fp:
+                if len(self.hips) > self.limit:
+                    self.hips = self.hips[:self.limit]
+                fp.writelines([str(ip) + '\n' for ip in self.hips])
+            average = {}
+            for ip in self.hips:
+                if ip.ip in average:
+                    average[ip.ip].append(ip)
+                else:
+                    average[ip.ip] = [ip]
+            self.aips = [IP(sum([t.t for t in v])/len(v), k, v[0].country) for k, v in average.items()]
+            with open(self.afile, 'w') as fp:
+                fp.writelines([str(ip)+'\n' for ip in self.aips])
+        # self.log.info('update %s, new=%d', self.hfile, len(self.ips))
+
+    @property
+    def hList(self):
+        if not self.hips and os.path.exists(self.hfile):
+            with self.__mutex:
+                with open(self.hfile, 'r') as fp:
+                    self.hips = [IP(*line.strip('\n').split(',')) for line in fp.readlines()]
+        return self.hips
+
+    @property
+    def aList(self):
+        if not self.aips and os.path.exists(self.afile):
+            with self.__mutex:
+                with open(self.afile, 'r') as fp:
+                    self.aips = [IP(*line.strip('\n').split(',')) for line in fp.readlines()]
+        return self.aips
 
 
 class IPScanner(threadutil.ServeThreadBase):
     def __init__(self, log=None):
         threadutil.ServeThreadBase.__init__(self, log=log)
-        self.ip_queue = Queue.PriorityQueue()
         self.ips = []
         self.info_duration = 3600
-        self.hfile = 'info.txt'
-        self.info_file_limit = 1000
         self.host_format = 'http://{}'
         self.dnsservers = ['8.8.8.8', '8.8.4.4']
         self.site_host = 'www.google.com'
+        self.data_file = DataFile(self.site_host, 1000, './data')
 
     def resolve_ips(self):
         self.log.info('update ips list: begin')
@@ -104,62 +146,29 @@ class IPScanner(threadutil.ServeThreadBase):
                     if self.isSetStop():
                         break
                     t = resolve(self.host_format.format(ip))
-                    item = IP(ip, t, country)
-                    print str(item)
+                    print "{},{},{}".format(t, ip, country)
                     if t:
-                        self.ips.append(item)
+                        self.ips.append(IP(t, ip, country))
         self.log.info('update ips list: end, %d new', len(self.ips))
         return self.ips
 
     @property
     def ipList(self):
-        # self.ips.sort()
         return self.ips
 
     def run(self):
         start_at = _time()
         self._set_server_available()
         self.ips = self.resolve_ips()
-        self._write_info_file()
+        self.data_file.updateFile(self.ips)
         while not self.isSetStop():
             if _time() - start_at > self.info_duration:
                 self.resolve_ips()
-                self._write_info_file()
+                self.data_file.updateFile(self.ips)
                 start_at = _time()
             else:
                 _sleep(2)
         self.log.info('IPScanner thread end')
-
-    def _write_info_file(self):
-        lines = []
-        if os.path.exists(self.hfile):
-            with open(self.hfile, 'r') as fp:
-                lines = fp.readlines()
-        with open(self.hfile, 'w') as fp:
-            if len(lines) > self.info_file_limit:
-                self.log.info('%s: %d', self.hfile, len(lines))
-                lines = lines[:self.info_file_limit]
-            avarage = {}
-            for line in lines:
-                ip, t, c, a = line.split(',')
-                if ip in avarage:
-                    avarage[ip].append(float(t))
-                else:
-                    avarage[ip] = [float(t)]
-            for ip in self.ips:
-                if ip.ip in avarage:
-                    avarage[ip.ip].append(float(ip.t))
-                else:
-                    avarage[ip.ip] = [float(ip.t)]
-            for k, v in avarage.items():
-                avarage[k] = sum(v)/len(v)
-            for i, line in enumerate(lines):
-                ip, t, c, a = line.split(',')
-                lines[i] = '{},{},{},{}\n'.format(ip, t, c, avarage[ip])
-            for ip in self.ips:
-                lines.append('{},{},{},{}\n'.format(ip.ip, ip.t, ip.country, avarage[ip.ip]))
-            fp.writelines(lines)
-        self.log.info('update %s, new=%d', self.hfile, len(self.ips))
 
 
 def main():
@@ -167,6 +176,9 @@ def main():
     scanner.info_duration = 5
     global coutries_filter
     coutries_filter = {'Singapore'}
+    print scanner.data_file.aList
+    print scanner.data_file.hList
+    scanner.data_file.updateFile([])
     try:
         scanner.start()
         _sleep(1)
@@ -181,13 +193,9 @@ def main():
             scanner.setToStop()
             scanner.join()
 
-def kk():
-    scanner = IPScanner(util.get_logger())
-    scanner._write_info_file()
-
 if __name__ == "__main__":
-    # kk()
     main()
+
 
 """
 Saudi Arabia

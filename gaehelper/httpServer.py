@@ -16,25 +16,6 @@ Protocol     = "HTTP/1.0"
 gIpScanner = None
 
 class MyRequestHandler(SimpleHTTPRequestHandler):
-    def _history(self):
-        with open(gIpScanner.hfile, 'r') as fp:
-            self.history_lines = fp.readlines()
-            ipmap = dict()
-            for line in self.history_lines:
-                ip, t, country, avarage = line.strip('\n').split(',')
-                ipmap[ip] = [avarage, ip, country]
-            return [v for k, v in ipmap.items()]
-
-    def _ip_history(self, ip):
-        result = []
-        if not hasattr(self, 'history_lines'):
-            with open(gIpScanner.hfile, 'r') as fp:
-                self.history_lines = fp.readlines()
-        for line in self.history_lines:
-            ip1, t, country, avarage = line.strip('\n').split(',')
-            if ip1 == ip:
-                result.append(t)
-        return [result]
 
     def send_head(self):
         content_type = 'text/html; charset=utf-8'
@@ -47,13 +28,24 @@ class MyRequestHandler(SimpleHTTPRequestHandler):
             return SimpleHTTPRequestHandler.send_head(self)
         elif req_path in ('/curr'):
             result_list = [[ip.t, ip.ip, ip.country] for ip in gIpScanner.ipList]
-            html = json.dumps({'name': 'curr', 'data': result_list, 'columns': ['t', 'ip', 'country']})
-        elif req_path in ('/history'):
-            html = json.dumps({'name': 'history', 'data': self._history(), 'columns': ['avarage', 'ip', 'country']})
+            html = json.dumps({'name': 'curr', 'data': result_list, 'columns': ['duration', 'ip', 'country']})
+        elif req_path in ('/average'):
+            history = [[ip.t, ip.ip, ip.country] for ip in gIpScanner.data_file.aList]
+            html = json.dumps({'name': 'history', 'data': history, 'columns': ['average', 'ip', 'country']})
         elif req_path in ('/ip_history'):
-            data = self._ip_history(param)
-            col = range(len(data[0]))
-            html = json.dumps({'name': 'ip_history', 'data': data, 'columns': col})
+            param = param.strip()
+            if param:
+                data = [
+                    [ip.t, ip.ip, ip.country]
+                    for ip in gIpScanner.data_file.hList
+                    if ip.ip == param
+                ]
+            else:
+                data = [
+                    [ip.t, ip.ip, ip.country]
+                    for ip in gIpScanner.data_file.hList
+                ]
+            html = json.dumps({'name': 'ip_history', 'data': data, 'columns': ['t', 'ip', 'country']})
         else:
             return SimpleHTTPRequestHandler.send_head(self)
         f = StringIO.StringIO(html)
