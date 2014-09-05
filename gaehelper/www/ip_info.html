@@ -1,0 +1,45 @@
+<html>
+<head>
+    <!--dataTable-->
+    <script type="text/javascript" language="javascript" src="inc/dbtb/js/jquery.js"></script>
+    <script type="text/javascript" language="javascript" src="inc/dbtb/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" language="javascript" src="inc/common.js"></script>
+    <style type="text/css" title="currentStyle">
+        @import "inc/dbtb/css/jquery.dataTables_themeroller.css";
+        @import "inc/dbtb/css/jquery.dataTables.min.css";
+    </style>
+    <!--visualize-->
+    <link href="inc/visualize/css/basic.css" type="text/css" rel="stylesheet" />
+    <script type="text/javascript" src="inc/visualize/js/enhance.js"></script>
+    <script type="text/javascript">
+        // Run capabilities test
+        enhance({
+            loadScripts: [
+                {src: 'inc/visualize/js/excanvas.js', iecondition: 'all'},
+                'inc/visualize/js/visualize.jQuery.js'
+            ],
+            loadStyles: [
+                'inc/visualize/css/visualize.css',
+                'inc/visualize/css/visualize-dark.css'
+            ]
+        });
+
+        $(document).ready(function() {
+            update_tabledata(
+                '../ip_history'+document.location.search,
+                'ip_history',
+                0,
+                function() {$('#ip_history').visualize({type: 'line', width: '100%'});}
+            );
+        });
+    </script>
+</head>
+<body class='body'>
+
+<div id="currdiv">
+    <table id="ip_history" class="display dataTable">
+    </table>
+</div>
+
+</body>
+</html>

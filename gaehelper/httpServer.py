@@ -5,7 +5,7 @@ import sys
 import json
 import StringIO
 import BaseHTTPServer
-from time import clock as _clock, sleep as _sleep
+from time import sleep as _sleep
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 from ipscanner import IPScanner, IP
 from vavava import util
@@ -16,44 +16,44 @@ Protocol     = "HTTP/1.0"
 gIpScanner = None
 
 class MyRequestHandler(SimpleHTTPRequestHandler):
-    def _info(self):
-        with open(gIpScanner.info_file, 'r') as fp:
-            lines = fp.readlines()
+    def _history(self):
+        with open(gIpScanner.hfile, 'r') as fp:
+            self.history_lines = fp.readlines()
             ipmap = dict()
-            for line in lines:
-                ip, country, t = line.split(',')
-                if ip in ipmap:
-                    ipmap[ip][1].append(float(t))
-                else:
-                    ipmap[ip] = (country, [float(t)])
-            curr = {}
-            for ip in gIpScanner.ipList:
-                curr[ip.ip] = float(ip.t)
-            avarage = []
-            for k, v in ipmap.items():
-                avarage.append(IP(k, sum(v[1])/len(v[1]), v[0]))
-            result_list = []
-            for ip in avarage:
-                if ip.ip in curr:
-                    result_list.append([ip.t, ip.ip, curr[ip.ip], ip.country])
-                else:
-                    result_list.append([ip.t, ip.ip, None, ip.country])
-        return result_list
+            for line in self.history_lines:
+                ip, t, country, avarage = line.strip('\n').split(',')
+                ipmap[ip] = [avarage, ip, country]
+            return [v for k, v in ipmap.items()]
+
+    def _ip_history(self, ip):
+        result = []
+        if not hasattr(self, 'history_lines'):
+            with open(gIpScanner.hfile, 'r') as fp:
+                self.history_lines = fp.readlines()
+        for line in self.history_lines:
+            ip1, t, country, avarage = line.strip('\n').split(',')
+            if ip1 == ip:
+                result.append(t)
+        return [result]
 
     def send_head(self):
         content_type = 'text/html; charset=utf-8'
+        param = ''
         req_path = self.path
-        pos = req_path.find('?')
-        if pos > 0:
-            req_path = req_path[:pos]
+        if req_path.find('?') > 0:
+            req_path, param = req_path.split('?')
         if req_path in ('/'):
             self.path = '/www/index.html'
             return SimpleHTTPRequestHandler.send_head(self)
         elif req_path in ('/curr'):
             result_list = [[ip.t, ip.ip, ip.country] for ip in gIpScanner.ipList]
-            html = json.dumps({'data': result_list})
-        elif req_path in ('/info'):
-           html = json.dumps({'data': self._info()})
+            html = json.dumps({'name': 'curr', 'data': result_list, 'columns': ['t', 'ip', 'country']})
+        elif req_path in ('/history'):
+            html = json.dumps({'name': 'history', 'data': self._history(), 'columns': ['avarage', 'ip', 'country']})
+        elif req_path in ('/ip_history'):
+            data = self._ip_history(param)
+            col = range(len(data[0]))
+            html = json.dumps({'name': 'ip_history', 'data': data, 'columns': col})
         else:
             return SimpleHTTPRequestHandler.send_head(self)
         f = StringIO.StringIO(html)

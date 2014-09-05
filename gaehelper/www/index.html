@@ -1,54 +1,35 @@
 <html>
 <head>
-<script type="text/javascript" language="javascript" src="www/inc/js/jquery.js"></script>
-<script type="text/javascript" language="javascript" src="www/inc/js/jquery.dataTables.min.js"></script>
-<style type="text/css" title="currentStyle">
-    @import "www/inc/css/jquery.dataTables_themeroller.css";
-    @import "www/inc/css/jquery.dataTables.min.css";
-</style>
+    <script type="text/javascript" language="javascript" src="www/inc/dbtb/js/jquery.js"></script>
+    <script type="text/javascript" language="javascript" src="www/inc/dbtb/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" language="javascript" src="www/inc/common.js"></script>
+    <style type="text/css" title="currentStyle">
+        @import "www/inc/dbtb/css/jquery.dataTables_themeroller.css";
+        @import "www/inc/dbtb/css/jquery.dataTables.min.css";
+    </style>
 
-<script type="text/javascript">
-    $(document).ready(function() {
-        $('#info').dataTable(
-            {
-                "ajax": "info",
-                "aoColumns": [
-                    { "sTitle": "duration" },
-                    { "sTitle": "ip" },
-                    { "sTitle": "curr" },
-                    { "sTitle": "country" },
-                ]
-            }
+    <style type="text/css">
+    div#historydiv {width:90%;float:left;border: 1px;}
+    div#currdiv {width:90%;float:left;border: 1px;}
+    </style>
 
-        );
-    } );
-
+    <script type="text/javascript">
         $(document).ready(function() {
-        $('#curr').dataTable(
-            {
-                "ajax": "curr",
-                "aoColumns": [
-                    { "sTitle": "duration" },
-                    { "sTitle": "ip" },
-                    { "sTitle": "country" },
-                ]
-            }
-
-        );
-    } );
-</script>
+            update_tabledata('curr', 'curr');
+            update_tabledata('history', 'history');
+        });
+    </script>
 </head>
 <body class='body'>
 
-<div style="width:500px;border:1px;margin-left:auto;margin-right:auto;" align="center">
-
+<div id="currdiv">
+    <table id="curr" class="display dataTable">
+    </table>
 </div>
-<table id="info" class="display dataTable" cellspacing="0" width="100%"
-       role="grid" style="width: 100%;">
-</table>
+<div id="historydiv">
+    <table id="history" class="display dataTable">
+    </table>
+</div>
 
-<table id="curr" class="display dataTable" cellspacing="0" width="100%"
-       role="grid" aria-describedby="example_info" style="width: 100%;">
-</table>
 </body>
-<html>
+</html>
