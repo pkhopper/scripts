@@ -24,12 +24,31 @@
             ]
         });
 
-        $(document).ready(function() {
+        $(document).ready(function(tb, data) {
             update_tabledata(
                 '../ip_history'+document.location.search,
                 'ip_history',
                 0,
-                function() {$('#ip_history').visualize({type: 'line', width: '100%'});}
+                function(tb, data) {
+                    aaData = [];
+                    col = []
+                    for (i in data['aaData']){
+                        aaData.push(parseFloat(data['aaData'][i][0]));
+                        col.push({"sTitle": i})
+                    }
+                    // console.log(data['aaData']);
+                    data['aaData'] = [aaData];
+                    data["aoColumns"] = col;
+                    $(tb).DataTable(data);
+                    w = '' + data['aaData'][0].length*20 + 'px';
+                    console.log(w);
+                    $(tb).visualize({type: 'bar'});
+                    $(tb).visualize({type: 'line'});
+                    // $(tb).visualize({type: 'line', width: w});
+                    // $(tb).visualize({type: 'line', width: '100%'});
+                    // $(tb).visualize({type: 'area', width: '100%'});
+                    // $(tb).visualize({type: 'char', width: '100%'});
+                }
             );
         });
     </script>
