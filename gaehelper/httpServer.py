@@ -7,7 +7,7 @@ import StringIO
 import BaseHTTPServer
 from time import sleep as _sleep
 from SimpleHTTPServer import SimpleHTTPRequestHandler
-from ipscanner import IPScanner, IP
+from ipscanner import IPScanner
 from vavava import util
 
 ServerClass  = BaseHTTPServer.HTTPServer
