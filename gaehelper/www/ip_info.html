@@ -30,24 +30,15 @@
                 'ip_history',
                 0,
                 function(tb, data) {
-                    aaData = [];
-                    col = []
-                    for (i in data['aaData']){
-                        aaData.push(parseFloat(data['aaData'][i][0]));
-                        col.push({"sTitle": i})
+                    data["aoColumns"].splice(1,2);
+                    aaData = data['aaData'];
+                    for (i in aaData){
+                        aaData[i].splice(1,2);
                     }
-                    // console.log(data['aaData']);
-                    data['aaData'] = [aaData];
-                    data["aoColumns"] = col;
                     $(tb).DataTable(data);
                     w = '' + data['aaData'][0].length*20 + 'px';
-                    console.log(w);
-                    $(tb).visualize({type: 'bar'});
+                    // $(tb).visualize({type: 'bar'});
                     $(tb).visualize({type: 'line'});
-                    // $(tb).visualize({type: 'line', width: w});
-                    // $(tb).visualize({type: 'line', width: '100%'});
-                    // $(tb).visualize({type: 'area', width: '100%'});
-                    // $(tb).visualize({type: 'char', width: '100%'});
                 }
             );
         });

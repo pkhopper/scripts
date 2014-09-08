@@ -27,25 +27,25 @@ class MyRequestHandler(SimpleHTTPRequestHandler):
             self.path = '/www/index.html'
             return SimpleHTTPRequestHandler.send_head(self)
         elif req_path in ('/curr'):
-            result_list = [[ip.t, ip.ip, ip.country] for ip in gIpScanner.ipList]
-            html = json.dumps({'name': 'curr', 'data': result_list, 'columns': ['duration', 'ip', 'country']})
+            result_list = [[ip.duration, ip.ip, ip.country, ip.timeString] for ip in gIpScanner.allAvailableIp]
+            html = json.dumps({'name': 'curr', 'data': result_list, 'columns': ['duration', 'ip', 'country', 'time']})
         elif req_path in ('/average'):
-            history = [[ip.t, ip.ip, ip.country] for ip in gIpScanner.data_file.aList]
-            html = json.dumps({'name': 'history', 'data': history, 'columns': ['average', 'ip', 'country']})
+            history = [[ip.duration, ip.ip, ip.country, ip.timeString] for ip in gIpScanner.historyIp]
+            html = json.dumps({'name': 'history', 'data': history, 'columns': ['average', 'ip', 'country', 'time']})
         elif req_path in ('/ip_history'):
             param = param.strip()
             if param:
                 data = [
-                    [ip.t, ip.ip, ip.country]
-                    for ip in gIpScanner.data_file.hList
+                    [ip.duration, ip.ip, ip.country, ip.timeString]
+                    for ip in gIpScanner.historyIp
                     if ip.ip == param
                 ]
             else:
                 data = [
-                    [ip.t, ip.ip, ip.country]
-                    for ip in gIpScanner.data_file.hList
+                    [ip.duration, ip.ip, ip.country, ip.timeString]
+                    for ip in gIpScanner.historyIp
                 ]
-            html = json.dumps({'name': 'ip_history', 'data': data, 'columns': ['t', 'ip', 'country']})
+            html = json.dumps({'name': 'ip_history', 'data': data, 'columns': ['t', 'ip', 'country', 'time']})
         else:
             return SimpleHTTPRequestHandler.send_head(self)
         f = StringIO.StringIO(html)
