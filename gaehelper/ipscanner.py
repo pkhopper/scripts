@@ -123,10 +123,12 @@ class IPScanner(threadutil.ServeThreadBase):
 
     def run(self):
         self.db = DatabaseIp(self.db_file)
-        self.__history_buff = self.db.getIpRecords(begin=datetime.now() - timedelta(hours=24))
+        self.__history_buff = self.db.getAvarageDurationEachIp(begin=datetime.now() - timedelta(hours=24))
+        gfwlist2pac.main(self.pac_cfg)
         self._set_server_available()
+        # started
         self.resolve_all_host_ip()
-        self.__history_buff = self.db.getIpRecords(begin=datetime.now() - timedelta(hours=24))
+        self.__history_buff = self.db.getAvarageDurationEachIp(begin=datetime.now()-timedelta(hours=24))
         last_resolve_at = last_refresh_at = _time()
         while not self.isSetStop():
             now = _time()

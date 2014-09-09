@@ -19,6 +19,11 @@ CREATE INDEX if not exists idx_create_at ON ip (create_at asc);
 """
 
 _now = datetime.now
+def _strptime(t, fmt="%Y-%m-%d %H:%M:%S"):
+    if isinstance(t, datetime):
+        return t
+    else:
+        return datetime.strptime(t[:t.find('.')], fmt)
 
 class DatabaseIp:
     def __init__(self, db_file='ip.db3'):
@@ -31,11 +36,11 @@ class DatabaseIp:
         sql = 'insert into ip(duration,ip,country,create_at) values(?,?,?,?)'
         self.db.execute(sql, (duration, ip, country, _now()))
 
-    def getIpRecords(self, begin=None, end=None, ip=None, order_by=None, top_n=None):
-        results = self.getRecords(begin, end, ip, order_by, top_n)
+    def getIpRecords(self, begin=None, end=None, ip=None, limit=None):
+        results = self.getRecords(begin, end, ip, limit)
         return [IP(*ip[1:]) for ip in results]
 
-    def getRecords(self, begin=None, end=None, ip=None, order_by=None, top_n=None):
+    def getRecords(self, begin=None, end=None, ip=None, limit=None):
         p = []
         sql = 'select * from ip'
         if begin or end or ip:
@@ -51,16 +56,33 @@ class DatabaseIp:
             p.append(ip)
         if sql and sql.endswith('and'):
             sql = sql[:-3]
-        if order_by:
-            sql += ' order by ?'
-        if top_n:
+        if limit:
             sql += ' order by id limit ?'
-            p.append(top_n)
+            p.append(limit)
         return self.db.fetch_all(sql, p)
 
-    # def getIPAvarageDuration(self):
-    #     sql =
-    #     return self.db.fetch_all(sql, p)
+    def getAvarageDurationEachIp(self, begin=None, end=None, ip=None, limit=None):
+        sql = 'select avg(a.duration) as duration, ip, country, create_at ' \
+              ' from ip as a'
+        p = []
+        if begin or end or ip:
+            sql += ' where'
+        if begin:
+            sql += ' create_at >= ? and'
+            p.append(begin)
+        if end:
+            sql += ' create_at >= ? and'
+            p.append(end)
+        if ip:
+            sql += ' ip = ? '
+            p.append(ip)
+        if sql and sql.endswith('and'):
+            sql = sql[:-3]
+        sql += ' group by ip order by avg(duration)'
+        if limit:
+            sql += ' limit {}'.format(limit)
+        results = self.db.fetch_all(sql, p)
+        return [IP(*ip) for ip in results]
 
     def close(self):
         self.db.close()
@@ -70,10 +92,7 @@ class IP:
     def __init__(self, *t_ip_country_time):
         """ DURATION, IP, COUNTRY"""
         self.duration, self.ip, self.country, t = t_ip_country_time
-        if isinstance(t, datetime):
-            self.time = t
-        else:
-            self.time = datetime.strptime(t[:t.find('.')], "%Y-%m-%d %H:%M:%S")
+        self.time = _strptime(t)
         self.duration = float(self.duration)
         self.avarage = self.duration
 
@@ -91,18 +110,18 @@ class IP:
 def main():
     import os
     dbfile = './tmp1.db3'
-    os.remove(dbfile)
+    # os.remove(dbfile)
     db = DatabaseIp(dbfile)
-    for pp in db.getIpRecords(top_n=3):
+    for pp in db.getAvarageDurationEachIp(limit=10):
         print pp
-    db.insert(100.1, '1.1.1.1', 'a')
-    db.insert(100.2, '1.1.1.2', 'b')
-    db.insert(100.3, '1.1.1.3', 'c')
-    db.insert(100.4, '1.1.1.4', 'd')
-    db.insert(100.5, '1.1.1.5', 'e')
+    db.insert(100.11, '1.1.1.1', 'a')
+    db.insert(100.22, '1.1.1.2', 'b')
+    db.insert(100.33, '1.1.1.3', 'c')
+    db.insert(100.44, '1.1.1.4', 'd')
+    db.insert(100.55, '1.1.1.5', 'e')
 
     for pp in db.getIpRecords(ip='1.1.1.3'):
-        print pp.timeString
+        print pp
 
 
 if __name__ == "__main__":
