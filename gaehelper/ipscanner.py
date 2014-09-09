@@ -43,7 +43,6 @@ def __get_host_ip_local(host='www.google.com', dnsservers=None):
 def __get_ip_from_github():
     url = r'https://raw.githubusercontent.com/Playkid/Google-IPs/master/README.md'
     http = httputil.HttpUtil()
-    # http.add_header('Referer', )
     html = http.get(url)
     matches = re.split('<th[^>]*>([^<]*)</th>', html)
     countries = dict()
@@ -60,13 +59,33 @@ get_host_ip = __get_ip_from_github
 _http = httputil.HttpUtil()
 
 
-def resolve(host, timeout=1):
+def resolve(host, port=80, host_string='', path=None, timeout=1):
+    import socket
+    sock = socket.socket(socket.AF_INET)
+    sock.settimeout(timeout or None)
+    package = 'GET / HTTP/1.1\n'
+    if path:
+        if not path.startswith('/'):
+            path = '/' + path
+        package = 'GET %s HTTP/1.1\n' % path
+    if host_string:
+        package += 'Host: %s\n' % host_string
+        package += 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:31.0) Gecko/20100101 Firefox/31.0\n'
+        package += 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\n'
+    package += '\n'
     try:
         start = _time()
-        _http.get(host, timeout=timeout)
+        sock.connect((host, port))
+        sock.send(package)
+        data = sock.recv(1024)
+        if not data or len(data) < 1:
+            return None
         return _time() - start
-    except:
+    except Exception as e:
         return None
+    finally:
+        if sock:
+            sock.close()
 
 
 class IPScanner(threadutil.ServeThreadBase):
@@ -75,8 +94,11 @@ class IPScanner(threadutil.ServeThreadBase):
         self.all_ip = {}
         self.__all_goodip = {}
         self.__all_goodip_list = []
-        self.__history_buff = []
-        self.__hbuff_refresh_duration = 60*5
+
+        self.__buff_avg = []
+        self.__buff_history = []
+        self.__buff_refresh_duration = 5
+
         self.db_file = './ip.db3'
         self.db = None
         self.info_duration = 3600
@@ -85,22 +107,27 @@ class IPScanner(threadutil.ServeThreadBase):
         self.site_host = 'www.google.com'
         self.pac_cfg = 'pac.cfg'
 
-    def resolve_all_host_ip(self):
+    def __resolve_all_host_ip(self):
         while True:
             try:
                 self.allip = get_host_ip()
-                self.allip['local'] = get_host_ip_local(self.site_host, self.dnsservers)
+                # self.allip['local'] = get_host_ip_local(self.site_host, self.dnsservers)
                 break
-            except:
+            except Exception as e:
+                self.log.exception(e)
+                break
+            finally:
                 if self.isSetStop():
                     return []
+
         count1 = count2 = 0
         for country, ips in self.allip.items():
             if country in coutries_filter:
                 for ip in ips:
                     if self.isSetStop():
                         break
-                    duration = resolve(self.host_format.format(ip))
+                    # duration = resolve(self.host_format.format(ip))
+                    duration = resolve(ip)
                     print '{}, {}, {}'.format(duration, ip, country)
                     if duration:
                         tmp = IP(duration, ip, country, _now())
@@ -113,34 +140,43 @@ class IPScanner(threadutil.ServeThreadBase):
                         self.db.insert(duration, ip, country)
         self.log.info('update {}, new {}'.format(count1, count2))
 
+    def __refresh_buffers(self, begin):
+        if not begin:
+            begin = datetime.now() - timedelta(hours=24)
+        self.__buff_avg = self.db.getAvgDurationEachIp(begin=begin)
+        self.__buff_history = self.db.getIpRecords(begin=begin)
+        self.log.info('update buffers: avg=%d, history=%d',
+                      len(self.__buff_avg), len(self.__buff_history))
+
     @property
-    def allAvailableIp(self):
+    def currBuff(self):
         return self.__all_goodip_list
 
     @property
-    def historyIp(self):
-        return self.__history_buff
+    def historyBuff(self):
+        return self.__buff_history
+
+    @property
+    def avgBuff(self):
+        return self.__buff_avg
 
     def run(self):
         self.db = DatabaseIp(self.db_file)
-        self.__history_buff = self.db.getAvarageDurationEachIp(begin=datetime.now() - timedelta(hours=24))
-        gfwlist2pac.main(self.pac_cfg)
+        self.__refresh_buffers(None)
         self._set_server_available()
-        # started
-        self.resolve_all_host_ip()
-        self.__history_buff = self.db.getAvarageDurationEachIp(begin=datetime.now()-timedelta(hours=24))
-        last_resolve_at = last_refresh_at = _time()
+
+        last_resolve_at = 0
+        last_refresh_at = 0
         while not self.isSetStop():
             now = _time()
             if now - last_resolve_at > self.info_duration:
-                self.resolve_all_host_ip()
+                self.__resolve_all_host_ip()
                 gfwlist2pac.main(self.pac_cfg)
                 last_resolve_at = _time()
-            elif now - last_refresh_at > self.__hbuff_refresh_duration:
-                begin=datetime.now() - timedelta(seconds=self.__hbuff_refresh_duration)
-                self.__history_buff += self.db.getIpRecords(begin=begin)
+            if now - last_refresh_at > self.__buff_refresh_duration:
+                self.__refresh_buffers(None)
                 last_refresh_at = _time()
-            else:
+            if _time() - now < 1:
                 _sleep(2)
         self.log.info('IPScanner thread end')
         if self.db:
@@ -169,8 +205,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
+    # main()
+    # resolve('127.0.0.1', port=8001, path='curr', timeout=3)
+    # resolve('209.20.75.76', timeout=3, host_string='www.sublimetext.com')
+    resolve('61.135.169.121', timeout=3)
 
 """
 Saudi Arabia

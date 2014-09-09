@@ -61,7 +61,7 @@ class DatabaseIp:
             p.append(limit)
         return self.db.fetch_all(sql, p)
 
-    def getAvarageDurationEachIp(self, begin=None, end=None, ip=None, limit=None):
+    def getAvgDurationEachIp(self, begin=None, end=None, ip=None, limit=None):
         sql = 'select avg(a.duration) as duration, ip, country, create_at ' \
               ' from ip as a'
         p = []
@@ -112,7 +112,7 @@ def main():
     dbfile = './tmp1.db3'
     # os.remove(dbfile)
     db = DatabaseIp(dbfile)
-    for pp in db.getAvarageDurationEachIp(limit=10):
+    for pp in db.getAvgDurationEachIp(limit=10):
         print pp
     db.insert(100.11, '1.1.1.1', 'a')
     db.insert(100.22, '1.1.1.2', 'b')

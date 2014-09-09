@@ -13,7 +13,10 @@ from vavava import util
 ServerClass  = BaseHTTPServer.HTTPServer
 Protocol     = "HTTP/1.0"
 
-gIpScanner = None
+
+log = util.get_logger()
+gIpScanner = IPScanner(log=util.get_logger())
+
 
 class MyRequestHandler(SimpleHTTPRequestHandler):
 
@@ -27,24 +30,18 @@ class MyRequestHandler(SimpleHTTPRequestHandler):
             self.path = '/www/index.html'
             return SimpleHTTPRequestHandler.send_head(self)
         elif req_path in ('/curr'):
-            result_list = [[ip.duration, ip.ip, ip.country, ip.timeString] for ip in gIpScanner.allAvailableIp]
-            html = json.dumps({'name': 'curr', 'data': result_list, 'columns': ['duration', 'ip', 'country', 'time']})
+            iplist = [[ip.duration, ip.ip, ip.country, ip.timeString] for ip in gIpScanner.currBuff]
+            html = json.dumps({'name': 'curr', 'data': iplist, 'columns': ['duration', 'ip', 'country', 'time']})
         elif req_path in ('/average'):
-            history = [[ip.duration, ip.ip, ip.country, ip.timeString] for ip in gIpScanner.historyIp]
+            history = [[ip.duration, ip.ip, ip.country, ip.timeString] for ip in gIpScanner.avgBuff]
             html = json.dumps({'name': 'history', 'data': history, 'columns': ['average', 'ip', 'country', 'time']})
         elif req_path in ('/ip_history'):
             param = param.strip()
-            if param:
-                data = [
-                    [ip.duration, ip.ip, ip.country, ip.timeString]
-                    for ip in gIpScanner.historyIp
-                    if ip.ip == param
-                ]
-            else:
-                data = [
-                    [ip.duration, ip.ip, ip.country, ip.timeString]
-                    for ip in gIpScanner.historyIp
-                ]
+            data = [
+                [ip.duration, ip.ip, ip.country, ip.timeString]
+                for ip in gIpScanner.historyBuff
+                if not param or ip.ip == param
+            ]
             html = json.dumps({'name': 'ip_history', 'data': data, 'columns': ['t', 'ip', 'country', 'time']})
         else:
             return SimpleHTTPRequestHandler.send_head(self)
@@ -56,6 +53,7 @@ class MyRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         return f
 
+
 HandlerClass = MyRequestHandler
 
 
@@ -64,10 +62,9 @@ def httpserver_serve(log):
         port = int(sys.argv[1])
     else:
         port = 8000
-    server_address = ('0.0.0.0', port)
 
     HandlerClass.protocol_version = Protocol
-    httpd = ServerClass(server_address, HandlerClass)
+    httpd = ServerClass(('0.0.0.0', port), HandlerClass)
 
     sa = httpd.socket.getsockname()
     log.info("Serving HTTP on {} port={}".format(sa[0], sa[1]))
@@ -75,9 +72,6 @@ def httpserver_serve(log):
 
 
 if __name__ == "__main__":
-    global gIpScanner
-    log = util.get_logger()
-    gIpScanner = IPScanner(log=log)
     try:
         gIpScanner.start()
         while not gIpScanner.isAvailable():
