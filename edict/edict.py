@@ -2,12 +2,10 @@
 # coding=utf-8
 
 import os
-import sys
 import re
-from online_dict import Trans
 from vavava import util
-
 from vavava import scriptutils
+from online_dict import Trans
 
 class EdictConfig(scriptutils.BaseConfig):
 
@@ -61,12 +59,6 @@ if __name__ == "__main__":
     from sys import argv
     cfg = EdictConfig().read_cmdline_config('edict.ini', __file__, argv)
     cfg.log = util.get_logger()
-    # try:
-    #     sys.stdout.write('')
-    #     for line in sys.stdin:
-    #         cfg.words.append(line)
-    # except:
-    #     pass
     try:
         main(cfg)
     except KeyboardInterrupt:

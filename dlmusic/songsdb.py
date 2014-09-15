@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS songs (
 class Songs:
     def __init__(self, db_file):
         self.db_file = db_file
-        self.db = sqliteutil.DBBase(db_file)
+        self.db = sqliteutil.Sqlite3Helper(db_file)
         self.db.get_connection()
         self.db.conn.executescript(SQL_CREATE_TABLES)
 
@@ -32,12 +32,10 @@ class Songs:
     def insert(self, code, title):
         sql = r'insert into songs(code, title, offline) values("%s", "%s", 0)' % (code, title)
         self.db.conn.execute(sql)
-        self.db.conn.commit()
 
     def set_offline(self, code, offline):
         sql = r'update songs set offline=%s where code=%s' % (offline, code)
         self.db.conn.execute(sql)
-        self.db.conn.commit()
 
     def get_need_offline_list(self):
         """return [(id,code,title,offline)]"""

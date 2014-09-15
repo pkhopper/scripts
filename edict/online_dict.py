@@ -1,7 +1,8 @@
 #!/usr/bin/python
-# thx, cp from http://www.tuicool.com/articles/eaeUVz
 
-import urllib2,sys
+# thx, cp from http://www.tuicool.com/articles/eaeUVz
+import sys
+import urllib2
 from HTMLParser import HTMLParser
 from vavava import util
 util.set_default_utf8()
