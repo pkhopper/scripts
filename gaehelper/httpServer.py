@@ -12,11 +12,8 @@ from vavava import util
 
 ServerClass  = BaseHTTPServer.HTTPServer
 Protocol     = "HTTP/1.0"
-
-
 log = util.get_logger()
 gIpScanner = IPScanner(log=util.get_logger())
-
 
 class MyRequestHandler(SimpleHTTPRequestHandler):
 
@@ -43,6 +40,8 @@ class MyRequestHandler(SimpleHTTPRequestHandler):
                 if not param or ip.ip == param
             ]
             html = json.dumps({'name': 'ip_history', 'data': data, 'columns': ['t', 'ip', 'country', 'time']})
+        elif req_path in ('/ss'):
+            html = json.dumps({'status': gIpScanner.status})
         else:
             return SimpleHTTPRequestHandler.send_head(self)
         f = StringIO.StringIO(html)
@@ -53,9 +52,7 @@ class MyRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         return f
 
-
 HandlerClass = MyRequestHandler
-
 
 def httpserver_serve(log):
     if sys.argv[1:]:
@@ -69,7 +66,6 @@ def httpserver_serve(log):
     sa = httpd.socket.getsockname()
     log.info("Serving HTTP on {} port={}".format(sa[0], sa[1]))
     httpd.serve_forever()
-
 
 if __name__ == "__main__":
     try:

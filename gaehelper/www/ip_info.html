@@ -30,15 +30,32 @@
                 'ip_history',
                 0,
                 function(tb, data) {
-                    data["aoColumns"].splice(1,2);
-                    aaData = data['aaData'];
-                    for (i in aaData){
-                        aaData[i].splice(1,2);
+                    aoColumns = [];
+                    for (i in data['aaData']) {
+                        aoColumns.push({'sTitle': data['aaData'][i][3]});
                     }
+                    data["aoColumns"] = aoColumns;
+
+                    aaData = [];
+                    for (i in data['aaData']){
+                        aaData.push(data['aaData'][i][0]);
+                    }
+                    data['aaData'] = [aaData];
+
                     $(tb).DataTable(data);
                     w = '' + data['aaData'][0].length*20 + 'px';
                     // $(tb).visualize({type: 'bar'});
-                    $(tb).visualize({type: 'line'});
+                    table = $(tb)
+                    table.visualize(
+                    {
+                        'type': 'line',
+                        // 'parseDirection': 'y',
+                        // 'height': 111,
+                        // 'width': 1111,
+                        // 'pieLabelPos': "outside"
+                    });
+                    table.appendTo('body')
+                    table.trigger('visualizeRefresh');
                 }
             );
         });

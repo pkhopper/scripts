@@ -19,7 +19,8 @@ function update_tabledata(url, tb, tp, callback){
         data = {
                 // retrieve: true,
                 "aaData": result["data"],
-                "aoColumns": col
+                "aoColumns": col,
+                // "scrollY": 340
         };
         if (tp == 0) {
             data['ordering'] = false;
@@ -29,7 +30,7 @@ function update_tabledata(url, tb, tp, callback){
         } else {
             $(tb).DataTable(data);
         }
-        console.log(data);
+        // console.log(data);
     });
 }
 

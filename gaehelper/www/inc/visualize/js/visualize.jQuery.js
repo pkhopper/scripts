@@ -2,11 +2,11 @@
  * --------------------------------------------------------------------
  * jQuery inputToButton plugin
  * Author: Scott Jehl, scott@filamentgroup.com
- * Copyright (c) 2009 Filament Group 
+ * Copyright (c) 2009 Filament Group
  * licensed under MIT (filamentgroup.com/examples/mit-license.txt)
  * --------------------------------------------------------------------
 */
-(function($) { 
+(function($) {
 $.fn.visualize = function(options, container){
 	return $(this).each(function(){
 		//configuration
@@ -30,14 +30,14 @@ $.fn.visualize = function(options, container){
 			barMargin: 1, //space around bars in bar chart (added to both sides of bar)
 			yLabelInterval: 30 //distance between y labels
 		},options);
-		
+
 		//reset width, height to numbers
 		o.width = parseFloat(o.width);
 		o.height = parseFloat(o.height);
-		
-		
+
+
 		var self = $(this);
-		
+
 		//function to scrape data from html table
 		function scrapeTable(){
 			var colors = o.colors;
@@ -84,7 +84,7 @@ $.fn.visualize = function(options, container){
 						dataSum += parseFloat(this);
 					});
 					return dataSum
-				},	
+				},
 				topValue: function(){
 						var topValue = 0;
 						var allData = this.allData().join(',').split(',');
@@ -128,7 +128,7 @@ $.fn.visualize = function(options, container){
 							thisTotal += parseFloat(this);
 						});
 						yTotals[i] = thisTotal;
-						
+
 					}
 					return yTotals;
 				},
@@ -159,32 +159,32 @@ $.fn.visualize = function(options, container){
 				},
 				yLabels: function(){
 					var yLabels = [];
-					yLabels.push(bottomValue); 
+					yLabels.push(bottomValue);
 					var numLabels = Math.round(o.height / o.yLabelInterval);
 					var loopInterval = Math.ceil(totalYRange / numLabels) || 1;
 					while( yLabels[yLabels.length-1] < topValue - loopInterval){
-						yLabels.push(yLabels[yLabels.length-1] + loopInterval); 
+						yLabels.push(yLabels[yLabels.length-1] + loopInterval);
 					}
-					yLabels.push(topValue); 
+					yLabels.push(topValue);
 					return yLabels;
-				}			
+				}
 			};
-			
+
 			return tableData;
 		};
-		
-		
+
+
 		//function to create a chart
 		var createChart = {
-			pie: function(){	
-				
+			pie: function(){
+
 				canvasContain.addClass('visualize-pie');
-				
-				if(o.pieLabelPos == 'outside'){ canvasContain.addClass('visualize-pie-outside'); }	
-						
+
+				if(o.pieLabelPos == 'outside'){ canvasContain.addClass('visualize-pie-outside'); }
+
 				var centerx = Math.round(canvas.width()/2);
 				var centery = Math.round(canvas.height()/2);
-				var radius = centery - o.pieMargin;				
+				var radius = centery - o.pieMargin;
 				var counter = 0.0;
 				var toRad = function(integer){ return (Math.PI/180)*integer; };
 				var labels = $('<ul class="visualize-labels"></ul>')
@@ -195,7 +195,7 @@ $.fn.visualize = function(options, container){
 					var fraction = (this <= 0 || isNaN(this))? 0 : this / dataSum;
 					ctx.beginPath();
 					ctx.moveTo(centerx, centery);
-					ctx.arc(centerx, centery, radius, 
+					ctx.arc(centerx, centery, radius,
 						counter * Math.PI * 2 - Math.PI * 0.5,
 						(counter + fraction) * Math.PI * 2 - Math.PI * 0.5,
 		                false);
@@ -212,7 +212,7 @@ $.fn.visualize = function(options, container){
 			        var topBottom = (labely > centery) ? 'bottom' : 'top';
 			        var percentage = parseFloat((fraction*100).toFixed(2));
 
-			        if(percentage){
+			        if(percentage && percentage > 3){
 			        	var labelval = (o.pieLabelsAsPercent) ? percentage + '%' : this;
 				        var labeltext = $('<span class="visualize-label">' + labelval +'</span>')
 				        	.css(leftRight, 0)
@@ -221,34 +221,34 @@ $.fn.visualize = function(options, container){
 				        var label = $('<li class="visualize-label-pos"></li>')
 				       			.appendTo(labels)
 				        		.css({left: labelx, top: labely})
-				        		.append(labeltext);	
+				        		.append(labeltext);
 				        labeltext
-				        	.css('font-size', radius / 8)		
+				        	.css('font-size', radius / 8)
 				        	.css('margin-'+leftRight, -labeltext.width()/2)
 				        	.css('margin-'+topBottom, -labeltext.outerHeight()/2);
-				        	
-				        if(dataGroups[i].textColor){ labeltext.css('color', dataGroups[i].textColor); }	
+
+				        if(dataGroups[i].textColor){ labeltext.css('color', dataGroups[i].textColor); }
 			        }
 			      	counter+=fraction;
 				});
 			},
-			
+
 			line: function(area){
-			
+
 				if(area){ canvasContain.addClass('visualize-area'); }
 				else{ canvasContain.addClass('visualize-line'); }
-			
+
 				//write X labels
 				var xInterval = canvas.width() / (xLabels.length -1);
 				var xlabelsUL = $('<ul class="visualize-labels-x"></ul>')
 					.width(canvas.width())
 					.height(canvas.height())
 					.insertBefore(canvas);
-				$.each(xLabels, function(i){ 
+				$.each(xLabels, function(i){
 					var thisLi = $('<li><span>'+this+'</span></li>')
 						.prepend('<span class="line" />')
 						.css('left', xInterval * i)
-						.appendTo(xlabelsUL);						
+						.appendTo(xlabelsUL);
 					var label = thisLi.find('span:not(.line)');
 					var leftOffset = label.width()/-2;
 					if(i == 0){ leftOffset = 0; }
@@ -265,8 +265,8 @@ $.fn.visualize = function(options, container){
 					.width(canvas.width())
 					.height(canvas.height())
 					.insertBefore(canvas);
-					
-				$.each(yLabels, function(i){  
+
+				$.each(yLabels, function(i){
 					var thisLi = $('<li><span>'+this+'</span></li>')
 						.prepend('<span class="line"  />')
 						.css('bottom',liBottom*i)
@@ -308,22 +308,22 @@ $.fn.visualize = function(options, container){
 					else {ctx.closePath();}
 				});
 			},
-			
+
 			area: function(){
 				createChart.line(true);
 			},
-			
+
 			bar: function(){
-				
+
 				canvasContain.addClass('visualize-bar');
-			
+
 				//write X labels
 				var xInterval = canvas.width() / (xLabels.length);
 				var xlabelsUL = $('<ul class="visualize-labels-x"></ul>')
 					.width(canvas.width())
 					.height(canvas.height())
 					.insertBefore(canvas);
-				$.each(xLabels, function(i){ 
+				$.each(xLabels, function(i){
 					var thisLi = $('<li><span class="label">'+this+'</span></li>')
 						.prepend('<span class="line" />')
 						.css('left', xInterval * i)
@@ -340,7 +340,7 @@ $.fn.visualize = function(options, container){
 					.width(canvas.width())
 					.height(canvas.height())
 					.insertBefore(canvas);
-				$.each(yLabels, function(i){  
+				$.each(yLabels, function(i){
 					var thisLi = $('<li><span>'+this+'</span></li>')
 						.prepend('<span class="line"  />')
 						.css('bottom',liBottom*i)
@@ -359,7 +359,7 @@ $.fn.visualize = function(options, container){
 				//iterate and draw
 				for(var h=0; h<dataGroups.length; h++){
 					ctx.beginPath();
-					var linewidth = (xInterval-o.barGroupMargin*2) / dataGroups.length; //removed +1 
+					var linewidth = (xInterval-o.barGroupMargin*2) / dataGroups.length; //removed +1
 					var strokeWidth = linewidth - (o.barMargin*2);
 					ctx.lineWidth = strokeWidth;
 					var points = dataGroups[h].points;
@@ -367,7 +367,7 @@ $.fn.visualize = function(options, container){
 					for(var i=0; i<points.length; i++){
 						var xVal = (integer-o.barGroupMargin)+(h*linewidth)+linewidth/2;
 						xVal += o.barGroupMargin*2;
-						
+
 						ctx.moveTo(xVal, 0);
 						ctx.lineTo(xVal, Math.round(-points[i]*yScale));
 						integer+=xInterval;
@@ -378,16 +378,16 @@ $.fn.visualize = function(options, container){
 				}
 			}
 		};
-	
+
 		//create new canvas, set w&h attrs (not inline styles)
-		var canvasNode = document.createElement("canvas"); 
+		var canvasNode = document.createElement("canvas");
 		canvasNode.setAttribute('height',o.height);
 		canvasNode.setAttribute('width',o.width);
 		var canvas = $(canvasNode);
-			
+
 		//get title for chart
 		var title = o.title || self.find('caption').text();
-		
+
 		//create canvas wrapper div, set inline w&h, append
 		var canvasContain = (container || $('<div class="visualize" role="img" aria-label="Chart representing data from the table: '+ title +'" />'))
 			.height(o.height)
@@ -406,19 +406,19 @@ $.fn.visualize = function(options, container){
 		var zeroLoc = o.height * (topValue/totalYRange);
 		var xLabels = tableData.xLabels();
 		var yLabels = tableData.yLabels();
-								
+
 		//title/key container
 		if(o.appendTitle || o.appendKey){
 			var infoContain = $('<div class="visualize-info"></div>')
 				.appendTo(canvasContain);
 		}
-		
+
 		//append title
 		if(o.appendTitle){
 			$('<div class="visualize-title">'+ title +'</div>').appendTo(infoContain);
 		}
-		
-		
+
+
 		//append key
 		if(o.appendKey){
 			var newKey = $('<ul class="visualize-key"></ul>');
@@ -429,35 +429,33 @@ $.fn.visualize = function(options, container){
 			else{
 				selector = self.find('tr:eq(0) th').filter(o.colFilter);
 			}
-			
+
 			selector.each(function(i){
 				$('<li><span class="visualize-key-color" style="background: '+dataGroups[i].color+'"></span><span class="visualize-key-label">'+ $(this).text() +'</span></li>')
 					.appendTo(newKey);
 			});
 			newKey.appendTo(infoContain);
-		};		
-		
+		};
+
 		//append new canvas to page
-		
+
 		if(!container){canvasContain.insertAfter(this); }
-		if( typeof(G_vmlCanvasManager) != 'undefined' ){ G_vmlCanvasManager.init(); G_vmlCanvasManager.initElement(canvas[0]); }	
-		
-		//set up the drawing board	
+		if( typeof(G_vmlCanvasManager) != 'undefined' ){ G_vmlCanvasManager.init(); G_vmlCanvasManager.initElement(canvas[0]); }
+
+		//set up the drawing board
 		var ctx = canvas[0].getContext('2d');
-		
+
 		//create chart
 		createChart[o.type]();
-		
+
 		//clean up some doubled lines that sit on top of canvas borders (done via JS due to IE)
 		$('.visualize-line li:first-child span.line, .visualize-line li:last-child span.line, .visualize-area li:first-child span.line, .visualize-area li:last-child span.line, .visualize-bar li:first-child span.line,.visualize-bar .visualize-labels-y li:last-child span.line').css('border','none');
 		if(!container){
 		//add event for updating
 		canvasContain.bind('visualizeRefresh', function(){
-			self.visualize(o, $(this).empty()); 
+			self.visualize(o, $(this).empty());
 		});
 		}
 	}).next(); //returns canvas(es)
 };
 })(jQuery);
-
-

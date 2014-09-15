@@ -25,6 +25,7 @@ def _strptime(t, fmt="%Y-%m-%d %H:%M:%S"):
     else:
         return datetime.strptime(t[:t.find('.')], fmt)
 
+
 class DatabaseIp:
     def __init__(self, db_file='ip.db3'):
         self.db_file = db_file

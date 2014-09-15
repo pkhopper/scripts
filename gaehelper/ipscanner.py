@@ -80,6 +80,7 @@ def resolve(host, port=80, host_string='', path=None, timeout=1):
         data = sock.recv(1024)
         if not data or len(data) < 1:
             return None
+        print data
         return _time() - start
     except Exception as e:
         return None
@@ -91,6 +92,7 @@ def resolve(host, port=80, host_string='', path=None, timeout=1):
 class IPScanner(threadutil.ServeThreadBase):
     def __init__(self, log=None):
         threadutil.ServeThreadBase.__init__(self, log=log)
+        self.__status = 0
         self.all_ip = {}
         self.__all_goodip = {}
         self.__all_goodip_list = []
@@ -107,7 +109,7 @@ class IPScanner(threadutil.ServeThreadBase):
         self.site_host = 'www.google.com'
         self.pac_cfg = 'pac.cfg'
 
-    def __resolve_all_host_ip(self):
+    def __check_all_ip(self):
         while True:
             try:
                 self.allip = get_host_ip()
@@ -160,22 +162,30 @@ class IPScanner(threadutil.ServeThreadBase):
     def avgBuff(self):
         return self.__buff_avg
 
+    @property
+    def status(self):
+        return self.__status
+
+
     def run(self):
         self.db = DatabaseIp(self.db_file)
         self.__refresh_buffers(None)
         self._set_server_available()
+        self.__status = 1
 
         last_resolve_at = 0
         last_refresh_at = 0
         while not self.isSetStop():
             now = _time()
             if now - last_resolve_at > self.info_duration:
-                self.__resolve_all_host_ip()
+                self.__status = 2
+                self.__check_all_ip()
                 gfwlist2pac.main(self.pac_cfg)
                 last_resolve_at = _time()
-            if now - last_refresh_at > self.__buff_refresh_duration:
+            # if now - last_refresh_at > self.__buff_refresh_duration:
+                self.__status = 3
                 self.__refresh_buffers(None)
-                last_refresh_at = _time()
+                # last_refresh_at = _time()
             if _time() - now < 1:
                 _sleep(2)
         self.log.info('IPScanner thread end')
@@ -208,7 +218,7 @@ if __name__ == "__main__":
     # main()
     # resolve('127.0.0.1', port=8001, path='curr', timeout=3)
     # resolve('209.20.75.76', timeout=3, host_string='www.sublimetext.com')
-    resolve('61.135.169.121', timeout=3)
+    print resolve('61.219.131.214', timeout=3)
 
 """
 Saudi Arabia
