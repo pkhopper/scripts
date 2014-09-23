@@ -21,7 +21,7 @@ _util.set_default_utf8()
 class M3u8Stream(ThreadBase):
     def __init__(self, axel, proxy=None, log=None):
         ThreadBase.__init__(self, log=log)
-        self.__oldurls = dict()
+        self.__oldurls = []
         self.__urltsks_q = Queue.Queue()
         self.__axel = axel
         self.__http = HttpUtil()
@@ -29,10 +29,12 @@ class M3u8Stream(ThreadBase):
         if proxy:
             self.__http.set_proxy(proxy)
 
-    def recode(self, url, duration, fp, npf, freq=10, detach=False):
-        """ @param npf: download url stream by n parts per file """
-        self.duration = duration
+    def recode(self, url, duration, vfmt, fp, npf, freq=10, detach=False):
+        """ @param npf: download url stream by n parts per file
+            @param vfmt: live video format """
         self.m3u8url = url
+        self.duration = duration
+        self.vfmt = int(vfmt) # TODO: ugly conversion
         self.__ostream = fp
         self.__npf = npf
         self.__freq = freq
@@ -47,13 +49,12 @@ class M3u8Stream(ThreadBase):
         except:
             raise
         finally:
-            if not self.__urltsks_q.empty():
-                wk = self.__urltsks_q.get()
-                wk.cleanup()
+            while not self.__urltsks_q.empty():
+                self.__urltsks_q.get().cleanup()
             self.log.debug('[M3u8Stream] stop')
 
     def __loop(self):
-        last_index_at = 0
+        last_clip_at = 0
         buff_stream_len = 0
         targetduration = 2
         start_at = time.time()
@@ -68,12 +69,23 @@ class M3u8Stream(ThreadBase):
 
             if self.duration and start_at >= stop_at:
                 self.log.info("[DownloadLiveStream] time's up")
-                break
+                return
 
             # get index page every 10s
-            if last_index_at + self.__freq < start_at:
-                last_index_at = start_at
-                self.__get_new_clip()
+            if last_clip_at + self.__freq < start_at:
+                urls, targetduration = self.__get_curr_m3u8_file(self.m3u8url)
+                for url in urls:
+                    if url not in self.__oldurls:
+                        memfile = BytesIO()
+                        memfile.read = memfile.getvalue
+                        urltask = UrlTask(url, out=memfile, npf=self.__npf,
+                                          bar=self.__progress_bar, log=self.log)
+                        self.__oldurls.append(url)
+                        self.__axel.addTask(urltask)
+                        self.__urltsks_q.put(urltask)
+                if len(self.__oldurls) > 100:
+                    self.__oldurls = self.__oldurls[-20:]
+                last_clip_at = start_at
 
             # append to stream; handle error; get a new clip
             if curr_tsk:
@@ -87,53 +99,46 @@ class M3u8Stream(ThreadBase):
                 elif curr_tsk.isError():
                     self.log.error('[M3u8Stream] error: %s', curr_tsk.url)
                     curr_tsk.cleanup()
-                    curr_tsk = None
                     raise
             elif not self.__urltsks_q.empty():
                 curr_tsk = self.__urltsks_q.get()
-                self.log.debug('[M3u8Stream] new clip, %s', curr_tsk.url)
 
-            duration = time.time() - start_at
-            if duration < 1:
+            if time.time() - start_at < 1:
                 sleep(1)
 
-    def __get_new_clip(self):
-        urls, targetduration = self.__get_curr_index()
-        for url in urls:
-            if url not in self.__oldurls:
-                memfile = BytesIO()
-                memfile.read = memfile.getvalue
-                urltask = UrlTask(url, out=memfile, npf=self.__npf,
-                                  bar=self.__progress_bar, log=self.log)
-                self.__oldurls[url] = True
-                self.__axel.addTask(urltask)
-                self.__urltsks_q.put(urltask)
-
-    def __get_curr_index(self, n=3):
+    def __get_curr_m3u8_file(self, m3u8url, n=3):
         urls = []
+        sub_m3u8s = []
         targetduration = 0
         try:
-            url_base = M3u8Stream.host_filter(self.m3u8url)
-            m3u8 = self.__http.get(self.m3u8url)
-            uris = m3u8.splitlines(False)
-            uris = [uri.strip(' \n') for uri in uris if uri.strip(' \n') != '']
-            tags = [uri for uri in uris if uri.startswith('#')]
-            urls = [url for url in uris if not url.startswith('#')]
-            if not urls[0].startswith('http'):
-                urls = [urllib.basejoin(url_base, url) for url in urls]
-            for tag in tags:
-                if tag.lower().find('targetduration') > 0:
-                    targetduration = int(tag.split(':')[1])
-                    self.log.debug('targetduration=%d', targetduration)
-                    break
-            if urls[0].endswith('.m3u8'):
-                self.m3u8url = urls[-1:][0]
-                # self.m3u8url = urls[0][0]
-                return self.__get_curr_index()
+            m3u8 = self.__http.get(m3u8url)
+            for line in m3u8.splitlines(False):
+                line = line.strip(' \n')
+                if line == '':
+                    continue
+                if line.startswith('#'):
+                    if line.lower().find('targetduration') > 0:
+                        targetduration = int(line.split(':')[1])
+                        self.log.debug('[M3u8Stream] targetduration=%d', targetduration)
+                else:
+                    if line.startswith('http'):
+                        urls.append(line)
+                    else:
+                        url = urllib.basejoin(M3u8Stream.host_filter(m3u8url), line)
+                        if line.endswith('.m3u8'):
+                            sub_m3u8s.append(url)
+                        else:
+                            urls.append(url)
+
+            sm_len = len(sub_m3u8s)
+            if sm_len > 0:
+                fmt_index = self.vfmt if self.vfmt < sm_len else sm_len-1
+                self.log.debug('[M3u8Stream] use sub m3u8 url: %s', sub_m3u8s[fmt_index])
+                return self.__get_curr_m3u8_file(sub_m3u8s[fmt_index])
         except urllib2.URLError as e:
-            self.log.warn('network not working: %s', e.message)
+            self.log.warn('[M3u8Stream] network not working: %s', e.message)
         except _socket_timeout:
-            self.log.warn('connection timeout')
+            self.log.warn('[M3u8Stream] connection timeout')
         except:
             raise
         return urls, targetduration

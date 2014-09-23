@@ -23,7 +23,7 @@ def __is_url_file(url):
     return info.type.find('url') > 0
 
 
-def recode(url, duration=None, outpath='./',
+def recode(url, duration=None, vfmt=2, outpath='./',
            npf=3, freq=10, tmin=5, tmax=20, proxy=None, log=None):
     assert duration is None or duration > 0
     name = '%s.%s.ts' % (_util.get_time_string(), hash(url))
@@ -42,7 +42,7 @@ def recode(url, duration=None, outpath='./',
         with open(outfile, 'wb') as fp:
             if url.find('m3u8') > 0 or __is_url_file(url):
                 axel.serve()
-                m3u8.recode(url=url, duration=duration, fp=fp, npf=npf, freq=cfg.freq)
+                m3u8.recode(url=url, duration=duration, vfmt=vfmt, fp=fp, npf=npf, freq=cfg.freq)
             else:
                 fetcher.fetch(url=url, fp=fp)
         log.info("|=> end: total=%.2fs, out=%s", time.time() - start_at, outfile)
@@ -83,7 +83,7 @@ def main(cfg):
         spath = _util.script_path(__file__)
         os.system('python %s/xbmc_5ivdo.py -t 直播 > %s'%(spath, cfg.address_file))
         return
-    recode(url=liveurl, duration=cfg.duration, outpath=cfg.outpath, npf=cfg.npf,
+    recode(url=liveurl, duration=cfg.duration, vfmt=cfg.vfmt, outpath=cfg.outpath, npf=cfg.npf,
            freq=cfg.freq, tmin=cfg.tmin, tmax=cfg.tmax, proxy=cfg.proxyaddr, log=cfg.log)
 
 

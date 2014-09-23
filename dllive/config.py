@@ -10,6 +10,7 @@ class DLLiveConfig(scriptutils.BaseConfig):
         return {
             'default  |outpath  |s': None,
             'default  |channel  |s': None,
+            'default  |vfmt     |i': None,
             'default  |liveurl  |s': None,
             'default  |addrfile |s': None,
             'default  |npf      |i': None,
@@ -24,24 +25,17 @@ class DLLiveConfig(scriptutils.BaseConfig):
         }
 
 
-
     def get_args(self, argv):
         usage = """./dllive [-i|l][-c config][-o out_put_path][-f favorite][-d duration]"""
         import argparse
-        parser=argparse.ArgumentParser(usage=usage, version='0.1')
+        parser=argparse.ArgumentParser(usage=usage, version='0.1.0')
         parser.add_argument('-c', '--config')
         parser.add_argument('-u', '--liveurl')
         parser.add_argument('-d', '--duration', type=float)
         parser.add_argument('-o', '--outpath',)
         parser.add_argument('-p', '--proxyaddr')
         parser.add_argument('-f', '--favorite')
+        parser.add_argument('--vfmt')
         parser.add_argument('-i', '--interactive', action='store_true', default=False)
         parser.add_argument('-l', '--channellist', action='store_true', default=False)
         return parser.parse_args()
-
-
-if __name__ == "__main__":
-    import sys
-    cfg = DLLiveConfig()
-    cfg.read_cmdline_config('dllive.ini', argv=sys.argv)
-    print cfg
