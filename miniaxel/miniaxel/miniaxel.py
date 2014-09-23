@@ -319,6 +319,8 @@ class HistoryFile:
                 os.remove(self.hfile)
 
 
+
+# local test code
 test_urls = {
         'dd3322be6b143c6a842acdb4bb5e9f60': 'http://localhost/w/dl/20140728233100.ts',
         # '0d851220f47e7aed4615aebbd5cd2c7a': 'http://localhost/w/dl/test.jpg'
