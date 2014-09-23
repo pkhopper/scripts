@@ -71,8 +71,9 @@ class VUrlTask(TaskBase):
         self.outname = None
         self.targetfiles = []
         self.__subtasks = []
+        self.__makeSubWorks()
 
-    def makeSubWorks(self):
+    def __makeSubWorks(self):
         urls, npf, headers = \
             self.parse_url(self.url, self.vidfmt, self.npf, self.outpath)
         if len(urls) == 0:
@@ -93,9 +94,9 @@ class VUrlTask(TaskBase):
             return
         subworks = []
         for tsk in self.__subtasks:
-            for wk in tsk.getSubWorks():
+            for wk in tsk.subWorks:
                 subworks.append(wk)
-        return subworks
+        self.addSubWorks(subworks)
 
     def parse_url(self, url, vidfmt, npf, outpath):
         parser = parsers.getVidPageParser(self.url)

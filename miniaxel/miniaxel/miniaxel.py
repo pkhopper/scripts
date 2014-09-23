@@ -34,8 +34,9 @@ class UrlTask(threadutil.TaskBase):
         self.__history_file = None
         self.headers = headers
         self.__callback = callback
+        self.__makeSubWorks()
 
-    def makeSubWorks(self):
+    def __makeSubWorks(self):
         curr_size = 0
         size = self.__get_content_len(self.url)
         clip_ranges = HttpFetcher.div_file(size, self.npf)
@@ -73,7 +74,7 @@ class UrlTask(threadutil.TaskBase):
                 headers=self.headers, proxy=self.proxy, callback=self.__update, log=self.log
             )
             subworks.append(work)
-        return subworks
+        self.addSubWorks(subworks)
 
     def __get_content_len(self, url):
         http = HttpUtil()

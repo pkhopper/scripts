@@ -16,8 +16,8 @@ pdirname = os.path.dirname
 pabspath = os.path.abspath
 
 test_urls = {
-        'dd3322be6b143c6a842acdb4bb5e9f60': 'http://localhost/w/dl/20140728233100.ts',
-        # '0d851220f47e7aed4615aebbd5cd2c7a': 'http://localhost/w/dl/test.jpg',
+        # 'dd3322be6b143c6a842acdb4bb5e9f60': 'http://localhost/w/dl/20140728233100.ts',
+        '0d851220f47e7aed4615aebbd5cd2c7a': 'http://localhost/w/dl/test.jpg',
         # '1c9d9fc9b01b4d5d1943b92f23b0e38e': 'http://localhost/w/dl/mysql-connector-java-gpl-5.1.31.msi',
         # '140c4a7c9735dd3006a877a9acca3c31': 'http://cdn.mysql.com/Downloads/Connector-J/mysql-connector-java-gpl-5.1.31.msi',
         # 'asdf': 'http://vavava.baoyibj.com/chaguan/'
@@ -38,7 +38,7 @@ def fTestFunc(axel, bar, url, md5, npf, log):
             log.info('[fTestFunc] n=%d', npf)
         return
     urltask = UrlTask(url, out=name, npf=npf, bar=bar,
-                      retrans=True, callback=archive_callback)
+                      retrans=True, callback=archive_callback, log=log)
     axel.addTask(urltask)
 
 def mTestFunc(axel, bar, url, md5, npf, log):
