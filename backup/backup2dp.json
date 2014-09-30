@@ -4,50 +4,45 @@
         {
             "name": "user.bash_profile",
             "path": "%(home)/.bash_profile",
-            "ignore": [],
             "linkfile": false
         },
         {
             "name": "user.zshrc",
             "path": "%(home)/.zshrc",
-            "ignore": [],
             "linkfile": false
         },
         {
             "name": "user.pk_profiles",
             "path": "%(home)/.pk_profiles",
-            "ignore": [],
             "linkfile": true
         },
         {
             "name": "user.ssh",
             "path": "%(home)/.ssh",
-            "ignore": [".git", "log"],
-            "linkfile": false
+            "ignore": [".git", "log"]
         },
         {
             "name": "user.bin",
             "path": "%(home)/bin",
-            "ignore": [".git", ".log"],
-            "linkfile": false
+            "ignore": [".git", ".log"]
         },
         {
             "name": "user.etc",
             "path": "%(home)/etc",
-            "ignore": [".git", ".log", "log"],
-            "linkfile": false
+            "ignore": [".git", ".log", "log"]
         },
         {
             "name": "user.lib",
             "path": "%(home)/lib",
-            "ignore": [".git", "log"],
-            "linkfile": false
+            "ignore": [".git", "log"]
         },
         {
             "name": "xampp.etc",
             "path": "/Applications/XAMPP/etc",
-            "ignore": [".git", ".log", "log"],
-            "linkfile": false
+            "ignore": [".git", ".log", "log"]
         }
+    ],
+    "includes": [
+        "sublimetext_backup.json"
     ]
 }

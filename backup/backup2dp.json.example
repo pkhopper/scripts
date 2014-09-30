@@ -1,0 +1,18 @@
+{
+    "outpath": "%(home)/Dropbox/autobackup",
+    "settings": [
+        {
+            "name": "output_name",
+            "path": "%(home)/.bash_profile",
+            // optional
+            "linkfile": true
+            // optional
+            "ignore": [".log", ".svn"]
+            // optional (regex)
+            "selects": ["\.py$", "\.c$"]
+        },
+    ],
+    "includes": [
+        "folder_path_or_file"
+    ]
+}
