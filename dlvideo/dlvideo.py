@@ -17,13 +17,29 @@ pjoin = os.path.join
 pdirname = os.path.dirname
 pabspath = os.path.abspath
 pexists = os.path.exists
-user_path = os.environ['HOME']
+try:
+    user_path = os.environ['HOME']
+except:
+    user_path = "./"
+    print("""os.environ['HOME'] not exists, use user_path = "./" """)
 
 
 default_encoding = sys.getfilesystemencoding()
 if default_encoding.lower() == 'ascii':
     default_encoding = 'utf-8'
 
+def dl_u2b(cfg):
+    if  not cfg.urls[0].find("youtube.com/"):
+        return False
+    if not util.check_cmd(cfg.u2b_cmd):
+        raise Exception( 'command not found:%s' %cfg.u2b_cmd)
+    cmd = cfg.u2b_cmd
+    cmd += r' --proxy "%s"' % cfg.u2b_proxy
+    cmd += r' --o "%s"' % cfg.u2b_tiele_format
+    cmd += r' --cache-dir "%s"' % cfg.u2b_cache
+    cmd += r' %s' % cfg.urls[0]
+    print('==> %s', cmd)
+    os.system(cmd)
 
 def main(cfg, log):
     if cfg.playlist:
@@ -62,7 +78,9 @@ if __name__ == "__main__":
     cfg = DLVideoConfig().read_cmdline_config('dlvideo.ini', __file__, sys.argv)
     log = cfg.log
     try:
-        main(cfg, log)
+        print sys.argv
+        if not dl_u2b(cfg):
+            main(cfg, log)
         if util.check_cmd('say'):
             os.system(r'say "download finished!!"')
     except KeyboardInterrupt as e:

@@ -15,7 +15,11 @@ pjoin = os.path.join
 pdirname = os.path.dirname
 pabspath = os.path.abspath
 pexists = os.path.exists
-user_path = os.environ['HOME']
+try:
+    user_path = os.environ['HOME']
+except:
+    user_path = "./"
+    print("""os.environ['HOME'] not exists, use user_path = "./" """)
 
 
 default_encoding = sys.getfilesystemencoding()

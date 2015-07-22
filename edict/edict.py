@@ -35,6 +35,8 @@ def info(w, dict_string):
         return r.group(1)
 
 def main(cfg):
+    if cfg.outpath is None or len(cfg.outpath) is 0:
+        cfg.outpath = "./"
     outfile = os.path.join(cfg.outpath, "edict.md")
     if not os.path.exists(outfile):
         with open(outfile, 'w') as fp:
@@ -45,13 +47,13 @@ def main(cfg):
     with open(outfile, 'a+') as fp:
         for w in cfg.words:
             if wexists(w.strip(), dict_string):
-                os.system('say exists')
+                #os.system('say exists')
                 print info(w, dict_string)
                 continue
             else:
                 content = '\n### %s\n%s' % (w, Trans().trans(w))
                 print content
-                os.system('say %s' % w)
+                #os.system('say %s' % w)
                 fp.write(content)
 
 if __name__ == "__main__":
@@ -60,7 +62,13 @@ if __name__ == "__main__":
     cfg = EdictConfig().read_cmdline_config('edict.ini', __file__, argv)
     cfg.log = util.get_logger()
     try:
-        main(cfg)
+        if cfg.words is None or len(cfg.words) is 0:
+            while True:
+                print ">>"
+                cfg.words = raw_input().split(" ")
+                main(cfg)
+        else:
+            main(cfg)
     except KeyboardInterrupt:
         print 'stop by user'
         exit(0)
