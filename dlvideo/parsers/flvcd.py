@@ -20,6 +20,7 @@ class FLVCD(VidParserBase):
         format = ['', 'high', 'super', 'real']
         if vidfmt > 0:
             parse_url += '&format=%s'%format[vidfmt]
+        parse_url += "&Go=1&go=1"  # 20150723
         http = HttpUtil()
         http.add_header('Referer', parse_url)
         print parse_url
