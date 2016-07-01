@@ -25,6 +25,7 @@ def getmatches(string):
 
 def save(matches, num):
     with open("%d.txt"%num, "w") as f:
+        f.write("%s,%s,%s,%s,%s,%s,%s,%s,\n"%("机构名称", "机构地址", "区县", "机构电话", "基本医保点", "医保编码", "新农合定点", "邮政编码"))
         for match in matches:
             line = "%s,%s,%s,%s,%s,%s,%s,%s,\n"%match
             f.write(line)
