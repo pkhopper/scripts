@@ -16,7 +16,7 @@ fi
 
 echo "download Python-2.7.12.tgz"
 if [ ! -f "Python-2.7.12.tgz" ]; then
-	curl "https://www.python.org/ftp/python/2.7.12/Python-2.7.12.tgz -o Python-2.7.12.tgz"
+	curl "https://www.python.org/ftp/python/2.7.12/Python-2.7.12.tgz" -o Python-2.7.12.tgz
 fi
 tar vxf "Python-2.7.12.tgz"
 cd Python-2.7.12
@@ -43,7 +43,7 @@ cd ..
 
 echo "download django.1.9.4.tar.gz"
 if [ ! -f "django.1.9.4.tar.gz" ]; then
-	curl "https://github.com/django/django/archive/1.9.4.tar.gz"  -o "django.1.9.4.tar.gz"
+	curl "https://github.com/django/django/archive/1.9.4.tar.gz"  -o django.1.9.4.tar.gz
 fi
 tar vxf "django.1.9.4.tar.gz"
 cd "django"
