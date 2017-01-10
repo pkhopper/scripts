@@ -18,7 +18,9 @@ def get_online_time():
     if resp.code == 200:
         t = resp.headers['Date']
         t = time.strptime(t, "%a, %d %b %Y %H:%M:%S %Z")
-        return t
+        t = datetime.datetime(*t[:6]) + datetime.timedelta(hours=8)
+        t = time.mktime(t.timetuple())
+        return time.localtime(t)
 
 
 
