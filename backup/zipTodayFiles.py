@@ -75,7 +75,7 @@ def main():
     rootDir = abspath(rootDir)
     get_files(rootDir, files)
     files = [f for f in files if datetime.date.fromtimestamp(os.path.getctime(f)) == datetime.date.today()]
-    out = strftime("%Y%m%d%H%M%S", get_online_time())
+    out = strftime("%Y%m%d.%H.%M.%S", get_online_time())
     out = join(rootDir, out + "_" + strftime("%Y%m%d%H%M%S", localtime()) + ".zip")
     zip_files(rootDir, files, out)
 
