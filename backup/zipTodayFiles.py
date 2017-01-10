@@ -67,7 +67,9 @@ def unzip_file(zipfilename, unziptodir):
 
 
 def main():
-    rootDir = argv[1]
+    rootDir = "./"
+    if len(argv) > 1:
+        rootDir = argv[1]
     files = []
     get_files(rootDir, files)
     files = [f for f in files if datetime.date.fromtimestamp(os.path.getctime(f)) == datetime.date.today()]
