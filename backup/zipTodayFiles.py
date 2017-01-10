@@ -24,8 +24,6 @@ def get_online_time():
 
 def get_files(root, files):
     for parent, dirnames, filenames in os.walk(root):
-        for dirname in dirnames:
-            get_files(dirname, files)
         for filename in filenames:
             files.append(abspath(join(parent, filename)))
 
@@ -36,6 +34,7 @@ def zip_files(root, files, zipName):
     try:
         zf = zipfile.ZipFile(tmp_zip, "w", zipfile.zlib.DEFLATED)
         for f in files:
+            print f
             zf.write(f, f[len(root):])
         zf.close()
         os.rename(tmp_zip, zipName)
@@ -71,6 +70,7 @@ def main():
     if len(argv) > 1:
         rootDir = argv[1]
     files = []
+    rootDir = abspath(rootDir)
     get_files(rootDir, files)
     files = [f for f in files if datetime.date.fromtimestamp(os.path.getctime(f)) == datetime.date.today()]
     out = strftime("%Y%m%d%H%M%S", get_online_time())
