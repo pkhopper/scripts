@@ -15,3 +15,7 @@ NEW_SHM_DUMP_PATH="${SHM_DUMP_PATH}_${DATE}"
 mv ${NEW_DB_PATH} ${NEW_DB_PATH}
 mv ${SHM_DUMP_PATH} ${NEW_SHM_DUMP_PATH}
 
+ipcs
+
+需要手动删除共享残留内存
+
