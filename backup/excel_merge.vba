@@ -1,6 +1,6 @@
 Sub merge()
-    Dim MyPath, MyName, AWbName     'mypathÎªµ±Ç°Â·¾¶ mynameÎªÎÄ¼þÃû awbnameÎªµ±Ç°»î¶¯ÎÄ¼þÃû'
-    Dim Wb As Workbook, WbN As String  'wb µ±Ç°Â·¾¶ÏÂÈ«²¿ÎÄ¼þÃûÊý×éÖÐµÄÎÄ¼þÃû'
+    Dim MyPath, MyName, AWbName
+    Dim Wb As Workbook, WbN As String
     Dim G As Long
     Dim Num As Long
     Dim BOX As String
@@ -15,11 +15,10 @@ Sub merge()
             Set Wb = Workbooks.Open(MyPath & "\" & MyName)
             Num = Num + 1
             With Workbooks(1).ActiveSheet
-                'next_row = .Range("A65536").End(xlUp).Row + 1
-                next_row = .UsedRange.Rows.Count + Num
+                next_row = .UsedRange.Rows.Count + .UsedRange.Row
                 .Cells(next_row, 1) = Left(MyName, Len(MyName) - 4)
                 For G = 1 To Sheets.Count
-                    next_row = .UsedRange.Rows.Count + 2
+                    next_row = .UsedRange.Rows.Count + .UsedRange.Row
                     Wb.Sheets(G).UsedRange.Copy .Cells(next_row, 1)
                 Next
                 WbN = WbN & Chr(13) & Wb.Name
@@ -30,5 +29,5 @@ Sub merge()
     Loop
     Range("B1").Select
     Application.ScreenUpdating = True
-    MsgBox "¹²ºÏ²¢ÁË" & Num & "¸ö¹¤×÷±¡ÏÂµÄÈ«²¿¹¤×÷±í¡£ÈçÏÂ£º" & Chr(13) & WbN, vbInformation, "ÌáÊ¾"
+    MsgBox "" & Num & "" & Chr(13) & WbN, vbInformation, ""
 End Sub
