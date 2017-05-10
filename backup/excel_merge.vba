@@ -1,4 +1,6 @@
 Sub merge()
+    ' last row count is: .UsedRange.Rows.Count + .UsedRange.Row - 1
+    ' ref: https://www.mrexcel.com/forum/excel-questions/693294-activesheet-usedrange-rows-count-returning-wrong-value.html
     Dim MyPath, MyName, AWbName
     Dim Wb As Workbook, WbN As String
     Dim G As Long
