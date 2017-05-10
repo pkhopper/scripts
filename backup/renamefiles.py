@@ -51,12 +51,28 @@ class OptionParser():
 
 
 def main():
-    args = OptionParser("path=", "force", "out=")
+    args = OptionParser("path=", "force", "out=", "undo", "sufix=")
+    if not args.path:
+        print("python rename.py --path=./123 --force --sufix=xls")
+        print("python rename.py --path=./123 --force --undo")
+        exit(0)
     root = pabspath(args.path if args.path else "./")
     for parent, dirs, files in os.walk(root):
         path_name = os.path.split(parent)
         path_name = path_name[len(path_name)-1]
         for f in files:
+            if args.undo:
+                if f.find(path_name) == 0:
+                    src = pjoin(parent, f)
+                    dst = pjoin(parent, f[len(path_name)+1:])
+                    if args.force:
+                        os.rename(src, dst)
+                    else:
+                        print(src, dst)
+                continue
+            if args.sufix:
+                if f.split('.')[1:][0] != args.sufix:
+                    continue
             src = pjoin(parent, f)
             dst = pjoin(parent, "%s_%s" % (path_name, f))
             if not args.force:
